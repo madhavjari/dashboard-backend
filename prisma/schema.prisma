@@ -13,24 +13,22 @@ datasource db {
 }
 
 model User{
-  id          Int           @id @default(uuid())
+  id          String        @id @default(uuid())
   firstName   String   
   lastName    String
   email       String        @unique
-  phoneNumber Int
+  phoneNumber String
   username    String        @unique
   password    String
-  createdAt   DateTime      @default(Date.now()) 
-  apikey      Apikey        @relation(fields: [apikeyId], references: [id]) 
-  apikeyId    Int        
-
+  createdAt   DateTime      @default(now()) 
+  apikey      Apikey?              
 }
 
 model Apikey{
-  id          Int           @id @default(uuid())
+  id          String        @id @default(uuid())
   keyHash     String        @unique
   User        User          @relation(fields: [userId], references:[id], onDelete: Cascade)
-  createdAt   DateTime      @default(Date.now())
+  userId      String        @unique
+  createdAt   DateTime      @default(now())
   expiresAt   DateTime      @default(dbgenerated("NOW() + interval '1 year'"))
-  @@index([userId])
 }
