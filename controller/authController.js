@@ -1,26 +1,26 @@
+const argon2 = require("argon2");
+const { createUser } = require("../db/authQueries");
+
 async function postRegister(req, res) {
   try {
-    const {
-      firstName,
-      lastName,
-      email,
-      phoneNumber,
-      username,
-      password,
-      confirmPassword,
-    } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const { firstName, lastName, email, phoneNumber, companyName, password } =
+      req.body;
+    const hashedPassword = await argon2.hash(password);
+    if (!hashedPassword)
+      return res.status(400).json({ message: "Error in hashing password" });
     const user = {
       firstName,
       lastName,
       email,
       phoneNumber,
-      username,
+      companyName,
       hashedPassword,
     };
-    await createUser(user);
-    res.status(201).json({
-      user,
+    const newUser = await createUser(user);
+    if (!newUser)
+      return res.status(400).json({ message: "error in creating user" });
+    return res.status(201).json({
+      newUser,
       message: "Registered Successfully",
     });
   } catch (err) {

@@ -12,16 +12,42 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  OWNER
+  ADMIN
+  ACCOUNTANT
+  VIEWER
+}
+
+
+model Company{
+  id          String        @id @default(uuid())
+  name        String        
+  users       CompanyUser[]
+}
+
 model User{
   id          String        @id @default(uuid())
   firstName   String   
   lastName    String
   email       String        @unique
-  phoneNumber String
-  username    String        @unique
+  phoneNumber Int
   password    String
-  createdAt   DateTime      @default(now()) 
+  createdAt   DateTime      @default(now())
+  companies   CompanyUser[]
   apikey      Apikey?              
+}
+
+model CompanyUser{
+  id          String        @id @default(uuid())
+  Company     Company       @relation(fields: [companyId], references:[id], onDelete: Cascade)
+  companyId   String
+  user        User          @relation(fields: [userId], references:[id], onDelete: Cascade)
+  userId      String
+  role        Role        @default(VIEWER)
+  createdAt   DateTime        @default(now())
+
+  @@unique([companyId, userId])
 }
 
 model Apikey{

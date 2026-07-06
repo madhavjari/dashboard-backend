@@ -1,9 +1,9 @@
 const { Router } = require("express");
 const syncController = require("../controller/syncController");
 
-const syncRouter = Router();
-const apiKeyAuth = require("../middleware/apiKeyAuth");
+const { apiKeyAuth } = require("../middleware/apiKeyAuth");
 
+const syncRouter = Router();
 syncRouter.post("/api/billdata", apiKeyAuth, syncController.postBillData);
 
 module.exports = syncRouter;

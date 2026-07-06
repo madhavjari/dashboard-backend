@@ -1,6 +1,6 @@
 const { z } = require("zod");
 
-const { findUser, findEmail } = require("../db/queries");
+const { emailExists } = require("../db/authQueries");
 
 const registerSchema = z.object({
   body: z
@@ -8,35 +8,50 @@ const registerSchema = z.object({
       firstName: z
         .string()
         .min(2, "First Name must be at least 2 characters")
-        .max(30, "First Name must be less than 30 characters"),
+        .max(32, "First Name must be less than 32 characters"),
       lastName: z
         .string()
         .min(2, "First Name must be at least 2 characters")
-        .max(30, "First Name must be less than 30 characters"),
+        .max(32, "First Name must be less than 32 characters"),
       email: z
-        .email("Invalid Email Format")
+        .email({
+          required_error: "Email is required.",
+          invalid_type_error: "Email is invalid.",
+        })
         .trim()
         .toLowerCase()
-        .max(30, "Email must be less than 30 characters")
+        .max(32, "Email must be less than 32 characters")
         .refine(
           async (email) => {
-            const user = await findEmail(email);
+            const user = await emailExists(email);
             return !user;
           },
           { message: "Email already taken" },
         ),
-      username: z
+      //         model User{
+      //   id          String        @id @default(uuid())
+      //   firstName   String
+      //   lastName    String
+      //   email       String        @unique
+      //   phoneNumber String
+      //   password    String
+      //   createdAt   DateTime      @default(now())
+      //   companies   CompanyUser[]
+      //   apikey      Apikey?
+      // }
+      companyName: z
         .string()
         .trim()
-        .min(5, "Username must be at least 5 characters long")
-        .max(30, "Username must have less than 30 characters")
-        .refine(
-          async (username) => {
-            const user = await findUser(username);
-            return !user;
-          },
-          { message: "username already taken" },
-        ),
+        .min(2, "Username must be at least 2 characters long")
+        .max(32, "Username must have less than 32 characters"),
+      phoneNumber: z
+        .string()
+        .trim()
+        .regex(/^\+91\d{10}$/, {
+          message:
+            "Security alert: Must be a valid +91 country code followed by 10 digits.",
+        })
+        .pipe(z.e164()),
       password: z
         .string()
         .min(8, "Password must be at least 8 characters")
@@ -74,17 +89,4 @@ const loginSchema = z.object({
       .max(30, "Let's not enter too large password"),
   }),
 });
-
-const postSchema = z.object({
-  body: z.object({
-    title: z.string().min(1, "Title is required").trim(),
-    content: z.string().min(1, "Content is required").trim(),
-  }),
-});
-
-const commentSchema = z.object({
-  body: z.object({
-    content: z.string().min(1, "Content is required").trim(),
-  }),
-});
-module.exports = { registerSchema, loginSchema, postSchema, commentSchema };
+module.exports = { registerSchema, loginSchema };
