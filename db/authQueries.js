@@ -41,13 +41,14 @@ async function createCompanyAndUser(user) {
         name: user.companyName,
       },
     });
-
     const newUser = await tx.user.create({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      password: user.hashedPassword,
+      data: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        password: user.hashedPassword,
+      },
     });
 
     await tx.companyUser.create({

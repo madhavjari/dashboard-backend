@@ -1,5 +1,5 @@
 const argon2 = require("argon2");
-const { createUser } = require("../db/authQueries");
+const { createCompanyAndUser } = require("../db/authQueries");
 
 async function postRegister(req, res) {
   try {
@@ -16,11 +16,12 @@ async function postRegister(req, res) {
       companyName,
       hashedPassword,
     };
-    const newUser = await createUser(user);
+    const { newUser, company } = await createCompanyAndUser(user);
     if (!newUser)
       return res.status(400).json({ message: "error in creating user" });
     return res.status(201).json({
       newUser,
+      company,
       message: "Registered Successfully",
     });
   } catch (err) {

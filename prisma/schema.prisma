@@ -31,7 +31,7 @@ model User{
   firstName   String   
   lastName    String
   email       String        @unique
-  phoneNumber Int
+  phoneNumber String
   password    String
   createdAt   DateTime      @default(now())
   companies   CompanyUser[]
