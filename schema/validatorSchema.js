@@ -11,16 +11,15 @@ const registerSchema = z.object({
         .max(32, "First Name must be less than 32 characters"),
       lastName: z
         .string()
-        .min(2, "First Name must be at least 2 characters")
-        .max(32, "First Name must be less than 32 characters"),
+        .min(2, "Last Name must be at least 2 characters")
+        .max(32, "Last Name must be less than 32 characters"),
       email: z
-        .email({
-          required_error: "Email is required.",
-          invalid_type_error: "Email is invalid.",
-        })
+        .string()
         .trim()
         .toLowerCase()
+        .min(1, "Email is Required.")
         .max(32, "Email must be less than 32 characters")
+        .pipe(z.email("Email is invalid"))
         .refine(
           async (email) => {
             const user = await emailExists(email);
@@ -28,17 +27,6 @@ const registerSchema = z.object({
           },
           { message: "Email already taken" },
         ),
-      //         model User{
-      //   id          String        @id @default(uuid())
-      //   firstName   String
-      //   lastName    String
-      //   email       String        @unique
-      //   phoneNumber String
-      //   password    String
-      //   createdAt   DateTime      @default(now())
-      //   companies   CompanyUser[]
-      //   apikey      Apikey?
-      // }
       companyName: z
         .string()
         .trim()
