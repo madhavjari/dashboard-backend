@@ -18,7 +18,7 @@ const registerSchema = z.object({
         .trim()
         .toLowerCase()
         .min(1, "Email is Required.")
-        .max(32, "Email must be less than 32 characters")
+        .max(100, "Email must be less than 100 characters")
         .pipe(z.email("Email is invalid"))
         .refine(
           async (email) => {
@@ -66,15 +66,17 @@ const registerSchema = z.object({
 
 const loginSchema = z.object({
   body: z.object({
-    username: z
+    email: z
       .string()
-      .min(1, "Username is required")
-      .max(30, "Do no breach max length")
-      .trim(),
+      .trim()
+      .toLowerCase()
+      .min(1, "Email is Required.")
+      .max(100, "Email must be less than 100 characters")
+      .pipe(z.email("Email is invalid")),
     password: z
       .string()
       .min(1, "Password is require")
-      .max(30, "Let's not enter too large password"),
+      .max(32, "Let's not enter too large password"),
   }),
 });
 module.exports = { registerSchema, loginSchema };

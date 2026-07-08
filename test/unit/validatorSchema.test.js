@@ -1,5 +1,5 @@
 jest.mock("../../db/authQueries");
-const { registerSchema, loginSchema } = require("../../schema/validatorSchema");
+const { registerSchema } = require("../../schema/validatorSchema");
 const { emailExists } = require("../../db/authQueries");
 
 const validRegisterBody = {

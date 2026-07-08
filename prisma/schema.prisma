@@ -35,6 +35,7 @@ model User{
   password    String
   createdAt   DateTime      @default(now())
   companies   CompanyUser[]
+  RefreshToken  RefreshToken[]  
   apikey      Apikey?              
 }
 
@@ -48,6 +49,19 @@ model CompanyUser{
   createdAt   DateTime        @default(now())
 
   @@unique([companyId, userId])
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  family    String   @db.Uuid
+  used      Boolean  @default(false) 
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@index([userId])
 }
 
 model Apikey{

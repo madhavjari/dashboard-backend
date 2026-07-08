@@ -1,5 +1,63 @@
 const { prisma } = require("../lib/prisma");
 
+async function createCompanyAndUser(user) {
+  return await prisma.$transaction(async (tx) => {
+    const company = await tx.company.create({
+      data: {
+        name: user.companyName,
+      },
+    });
+    const newUser = await tx.user.create({
+      data: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        password: user.hashedPassword,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phoneNumber: true,
+      },
+    });
+
+    await tx.companyUser.create({
+      data: {
+        companyId: company.id,
+        userId: newUser.id,
+        role: "OWNER",
+      },
+    });
+    return { company, newUser };
+  });
+}
+
+async function findUser(columns, where = {}) {
+  const selectClause = columns.reduce((acc, columnName) => {
+    acc[columnName] = true;
+    return acc;
+  }, {});
+  const user = await prisma.user.findFirst({
+    where: where,
+    select: selectClause,
+  });
+  return user;
+}
+
+async function createRefreshToken({ userId, tokenHash, expiresAt, family }) {
+  await prisma.refreshToken.create({
+    data: {
+      userId,
+      tokenHash,
+      expiresAt,
+      family,
+    },
+  });
+}
+
 async function findUserFromApi(apikey) {
   const user = await prisma.apikey.findFirst({
     select: {
@@ -34,37 +92,11 @@ async function emailExists(email) {
   else return true;
 }
 
-async function createCompanyAndUser(user) {
-  await prisma.$transaction(async (tx) => {
-    const company = await tx.company.create({
-      data: {
-        name: user.companyName,
-      },
-    });
-    const newUser = await tx.user.create({
-      data: {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        password: user.hashedPassword,
-      },
-    });
-
-    await tx.companyUser.create({
-      data: {
-        companyId: company.id,
-        userId: newUser.id,
-        role: "OWNER",
-      },
-    });
-    return { company, newUser };
-  });
-}
-
 module.exports = {
   findUserFromApi,
   emailExists,
   generateApikey,
   createCompanyAndUser,
+  findUser,
+  createRefreshToken,
 };

@@ -1,5 +1,5 @@
 const { findUserFromApi } = require("../db/authQueries");
-const { hashString } = require("../utils/hashString");
+const { hashString } = require("../utils/token");
 
 async function apiKeyAuth(req, res, next) {
   try {

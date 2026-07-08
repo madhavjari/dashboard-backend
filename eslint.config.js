@@ -12,12 +12,13 @@ module.exports = [
       },
     },
   },
-  js.configs.recommended,
   {
     files: ["**/*.test.js", "**/*.spec.js"],
     plugins: { jest },
     rules: jest.configs.recommended.rules,
   },
+  js.configs.recommended,
+
   {
     files: ["**/*.js"],
     rules: {

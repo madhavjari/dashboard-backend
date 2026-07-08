@@ -1,13 +1,21 @@
 const argon2 = require("argon2");
-const { createCompanyAndUser } = require("../db/authQueries");
+const {
+  createCompanyAndUser,
+  findUser,
+  createRefreshToken,
+} = require("../db/authQueries");
+const {
+  getAccessToken,
+  generatedRefreshToken,
+  refreshCookieOptions,
+  refreshExpiry,
+} = require("../utils/token");
 
 async function postRegister(req, res) {
   try {
     const { firstName, lastName, email, phoneNumber, companyName, password } =
       req.body;
     const hashedPassword = await argon2.hash(password);
-    if (!hashedPassword)
-      return res.status(400).json({ message: "Error in hashing password" });
     const user = {
       firstName,
       lastName,
@@ -25,9 +33,79 @@ async function postRegister(req, res) {
       message: "Registered Successfully",
     });
   } catch (err) {
+    if (err.code === "P2002") {
+      return res.status(409).json({ message: "Email already taken" });
+    }
     console.error(err);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
-module.exports = { postRegister };
+async function postLogin(req, res) {
+  const { email, password } = req.body;
+  try {
+    const user = await findUser(["id", "email", "password"], { email: email });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+    const match = await argon2.verify(user.password, password);
+    if (!match) {
+      return res.status(401).json({
+        message: "Invalid username or Password",
+      });
+    }
+    const accessToken = getAccessToken(user.id);
+    const { refreshToken, refreshTokenHash } = generatedRefreshToken();
+    await createRefreshToken({
+      userId: user.id,
+      tokenHash: refreshTokenHash,
+      expiresAt: refreshExpiry(),
+      family: crypto.randomUUID(),
+    });
+    res
+      .cookie("refresh_token", refreshToken, refreshCookieOptions)
+      .json({ accessToken });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      message: "Internal Server Error",
+    });
+  }
+}
+
+// async function postRefreshToken(req, res) {
+//   try {
+//     const presentedToken = req.cookies?.refresh_token;
+//     if (!presentedToken) {
+//       return res.status(401).json({ error: "Missing refresh token" });
+//     }
+//     const presentedHash = hashToken(presentedToken);
+//     const stored = await findRefreshToken({ tokenHash: presentedHash });
+//     if (!stored || stored.expiresAt < new Date() || stored.revoked) {
+//       return res.status(401).json({ error: "Invalid refresh token" });
+//     }
+//     if (stored.used) {
+//       await updateTokenRevoke({ family: stored.family }, { revoked: true });
+//       return res.status(401).json({ error: "Refresh token reuse detected" });
+//     }
+//     const { token: newRefreshToken, hash: newRefreshTokenHash } =
+//       generatedRefreshToken();
+
+//     await rotateRefreshToken({
+//       id: stored.id,
+//       userId: stored.userId,
+//       newHash: newRefreshTokenHash,
+//       family: stored.family,
+//       expiresAt: refreshExpiry(),
+//     });
+//     const username = await getUsernameByID(stored.userId);
+//     const newAccessToken = getAccessToken(username.username);
+//     res
+//       .cookie("refresh_token", newRefreshToken, refreshCookieOptions)
+//       .json({ accessToken: newAccessToken });
+//   } catch {
+//     return res.status(500).json({ message: "Internal Server Error" });
+//   }
+// }
+
+module.exports = { postRegister, postLogin };
