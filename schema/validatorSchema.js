@@ -1,6 +1,6 @@
 const { z } = require("zod");
 
-const { emailExists } = require("../db/authQueries");
+const { findUser } = require("../db/authQueries");
 
 const registerSchema = z.object({
   body: z
@@ -22,7 +22,7 @@ const registerSchema = z.object({
         .pipe(z.email("Email is invalid"))
         .refine(
           async (email) => {
-            const user = await emailExists(email);
+            const user = await findUser(["id"], { email: email });
             return !user;
           },
           { message: "Email already taken" },

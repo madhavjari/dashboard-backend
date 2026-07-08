@@ -82,21 +82,61 @@ async function generateApikey(apikey, userId) {
   });
 }
 
-async function emailExists(email) {
-  const user = await prisma.user.findFirst({
+async function findRefreshToken({ tokenHash }) {
+  const token = await prisma.refreshToken.findFirst({
+    select: {
+      id: true,
+      expiresAt: true,
+      userId: true,
+      tokenHash: true,
+      family: true,
+      used: true,
+    },
     where: {
-      email: email,
+      tokenHash: tokenHash,
     },
   });
-  if (!user) return false;
-  else return true;
+  return token;
+}
+
+async function updateTokenStatus({ tokenHash, family, revoked }) {
+  const whereClause = tokenHash ? { tokenHash } : { family };
+
+  return await prisma.refreshToken.updateMany({
+    where: whereClause,
+    data: { revoked },
+  });
+}
+
+async function rotateRefreshToken({ id, userId, newHash, family, expiresAt }) {
+  await prisma.$transaction(async (tx) => {
+    await tx.refreshToken.update({
+      where: {
+        id: id,
+      },
+      data: {
+        used: true,
+      },
+    });
+
+    await tx.refreshToken.create({
+      data: {
+        userId: userId,
+        tokenHash: newHash,
+        family: family,
+        expiresAt,
+      },
+    });
+  });
 }
 
 module.exports = {
   findUserFromApi,
-  emailExists,
   generateApikey,
   createCompanyAndUser,
   findUser,
   createRefreshToken,
+  findRefreshToken,
+  updateTokenStatus,
+  rotateRefreshToken,
 };

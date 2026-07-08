@@ -4,12 +4,12 @@ require("dotenv/config");
 
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 30;
+const isProd = process.env.NODE_ENV === "production";
 
 function getAccessToken(id) {
   return jwt.sign(
     {
       sub: id,
-      jti: crypto.randomUUID(),
     },
     process.env.JWT_SECRET_KEY,
     {
@@ -29,8 +29,8 @@ function generatedRefreshToken() {
 
 const refreshCookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "none",
+  secure: isProd,
+  sameSite: isProd ? "none" : "lax",
   path: "/api/auth",
   maxAge: REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
 };
