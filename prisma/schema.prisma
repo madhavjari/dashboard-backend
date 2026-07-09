@@ -35,8 +35,38 @@ model User{
   password    String
   createdAt   DateTime      @default(now())
   companies   CompanyUser[]
-  RefreshToken  RefreshToken[]  
+  RefreshToken  RefreshToken[]
+  emailVerified Boolean     @default(false)
+  emailVerificationTokens EmailVerificationToken[]
+  phoneVerified Boolean     @default(false)
+  phoneVerificationTokens phoneVerificationToken[]  
   apikey      Apikey?              
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+
+  token     String   @unique
+
+  expiresAt DateTime
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model phoneVerificationToken {
+  id        String   @id @default(cuid())
+
+  token     String   @unique
+
+  expiresAt DateTime
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
 
 model CompanyUser{
