@@ -60,7 +60,10 @@ async function postRegister(req, res) {
 async function postLogin(req, res) {
   const { email, password } = req.body;
   try {
-    const user = await findUser(["id", "email", "password"], { email: email });
+    const user = await findUser(
+      ["id", "email", "password", ["emailVerified"]],
+      { email: email },
+    );
     if (!user) {
       return res.status(401).json({ message: "Invalid username or password" });
     }
@@ -80,7 +83,7 @@ async function postLogin(req, res) {
     });
     res
       .cookie("refresh_token", refreshToken, refreshCookieOptions)
-      .json({ accessToken });
+      .json({ accessToken, isVerified: user.emailVerified });
   } catch (err) {
     console.error(err);
     return res.status(500).json({
