@@ -19,6 +19,11 @@ authRouter.post(
 
 authRouter.post("/api/auth/verify-email", authController.postVerifyEmail);
 
+authRouter.post(
+  "/api/auth/resend-verification",
+  authController.postResendVerification,
+);
+
 authRouter.post("/api/auth/refresh", authController.postRefreshToken);
 
 authRouter.post("/api/auth/logout", authController.postLogout);

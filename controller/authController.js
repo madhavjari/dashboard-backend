@@ -9,6 +9,7 @@ const {
   createEmailVerification,
   findVerificationToken,
   updateAndDeleteVerificationToken,
+  deleteVerificationToken,
 } = require("../db/authQueries");
 const {
   getAccessToken,
@@ -18,6 +19,8 @@ const {
   refreshExpiry,
   hashString,
 } = require("../utils/token");
+
+const { sendWithRetry } = require("../utils/sendWithRetry");
 
 const sendVerificationEmail = require("../services/email");
 
@@ -39,7 +42,11 @@ async function postRegister(req, res) {
       return res.status(400).json({ message: "error in creating user" });
     const { token, tokenHash } = generateToken();
     await createEmailVerification(tokenHash, newUser.id);
-    await sendVerificationEmail(email, token);
+    try {
+      await sendWithRetry(() => sendVerificationEmail(email, token));
+    } catch (err) {
+      console.error("Verification email failed after retries:", err);
+    }
     return res.status(201).json({ message: "user registered successfully" });
   } catch (err) {
     if (err.code === "P2002") {
@@ -79,6 +86,34 @@ async function postLogin(req, res) {
     return res.status(500).json({
       message: "Internal Server Error",
     });
+  }
+}
+
+async function postResendVerification(req, res) {
+  try {
+    const { email } = req.body;
+    const user = await findUser(["id", "emailVerified"], { email });
+    if (!user || user.emailVerified) {
+      return res.status(200).json({
+        message: "If an account exists, a verification email has been sent.",
+      });
+    }
+
+    const { token, tokenHash } = generateToken();
+    await deleteVerificationToken(user.id);
+    await createEmailVerification(tokenHash, user.id);
+    try {
+      await sendWithRetry(() => sendVerificationEmail(email, token));
+    } catch (err) {
+      console.error("Verification email failed after retries:", err);
+    }
+
+    return res.status(200).json({
+      message: "If an account exists, a verification email has been sent.",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
@@ -168,4 +203,5 @@ module.exports = {
   postRefreshToken,
   postLogout,
   postVerifyEmail,
+  postResendVerification,
 };

@@ -3,6 +3,8 @@ const globals = require("globals");
 const jest = require("eslint-plugin-jest");
 
 module.exports = [
+  js.configs.recommended,
+
   {
     languageOptions: {
       ecmaVersion: 2021,
@@ -12,12 +14,19 @@ module.exports = [
       },
     },
   },
+
   {
     files: ["**/*.test.js", "**/*.spec.js"],
     plugins: { jest },
-    rules: jest.configs.recommended.rules,
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
+    },
+    rules: {
+      ...jest.configs.recommended.rules,
+    },
   },
-  js.configs.recommended,
 
   {
     files: ["**/*.js"],

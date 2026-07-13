@@ -99,6 +99,14 @@ async function updateAndDeleteVerificationToken(verification) {
   ]);
 }
 
+async function deleteVerificationToken(userId) {
+  await prisma.emailVerificationToken.deleteMany({
+    where: {
+      userId,
+    },
+  });
+}
+
 async function findUserFromApi(apikey) {
   const user = await prisma.apikey.findFirst({
     select: {
@@ -183,4 +191,5 @@ module.exports = {
   rotateRefreshToken,
   createEmailVerification,
   updateAndDeleteVerificationToken,
+  deleteVerificationToken,
 };
