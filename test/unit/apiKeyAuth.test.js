@@ -1,8 +1,8 @@
-const { hashString } = require("../../utils/hashString.js");
+const { hashString } = require("../../utils/token.js");
 const { apiKeyAuth } = require("../../middleware/apiKeyAuth.js");
 const { findUserFromApi } = require("../../db/authQueries.js");
 
-jest.mock("../../utils/hashString", () => ({
+jest.mock("../../utils/token.js", () => ({
   hashString: jest.fn(),
 }));
 

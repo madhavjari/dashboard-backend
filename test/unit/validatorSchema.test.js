@@ -1,6 +1,6 @@
 jest.mock("../../db/authQueries");
 const { registerSchema } = require("../../schema/validatorSchema");
-const { emailExists } = require("../../db/authQueries");
+const { findUser } = require("../../db/authQueries");
 
 const validRegisterBody = {
   firstName: "John",
@@ -15,7 +15,7 @@ const validRegisterBody = {
 describe("registerSchema", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    emailExists.mockResolvedValue(false); // default: email not taken
+    findUser.mockResolvedValue(false); // default: email not taken
   });
 
   test("passes with valid data", async () => {
@@ -35,7 +35,7 @@ describe("registerSchema", () => {
   });
 
   test("fails when email already exists", async () => {
-    emailExists.mockResolvedValue(true);
+    findUser.mockResolvedValue(true);
     const result = await registerSchema.safeParseAsync({
       body: validRegisterBody,
     });
@@ -46,11 +46,13 @@ describe("registerSchema", () => {
     expect(emailError.message).toBe("Email already taken");
   });
 
-  test("calls emailExists with the normalized (lowercased/trimmed) email", async () => {
+  test("calls findUser with the normalized (lowercased/trimmed) email", async () => {
     await registerSchema.safeParseAsync({
       body: { ...validRegisterBody, email: "  John.Doe@Example.com  " },
     });
-    expect(emailExists).toHaveBeenCalledWith("john.doe@example.com");
+    expect(findUser).toHaveBeenCalledWith(["id"], {
+      email: "john.doe@example.com",
+    });
   });
 
   describe("firstName", () => {

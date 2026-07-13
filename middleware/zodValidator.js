@@ -6,14 +6,18 @@ const validate = (schema) => async (req, res, next) => {
   });
 
   if (!result.success) {
-    return res.status(400).json({
-      status: "fail",
-      errors: result.error.flatten().fieldErrors,
-    });
+    const errors = {};
+    for (const issue of result.error.issues) {
+      const [, ...fieldPath] = issue.path;
+      const key = fieldPath.join(".") || issue.path[0];
+      if (!errors[key]) errors[key] = [];
+      errors[key].push(issue.message);
+    }
+    return res.status(400).json({ status: "fail", errors });
   }
-  req.body = result.data.body;
-  req.query = result.data.query;
-  req.params = result.data.params;
+  req.body = result.data.body ?? req.body;
+  req.query = result.data.query ?? req.query;
+  req.params = result.data.params ?? req.params;
 
   next();
 };
