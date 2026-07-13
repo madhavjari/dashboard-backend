@@ -1,5 +1,5 @@
 jest.mock("../../db/authQueries");
-const { registerSchema } = require("../../schema/validatorSchema");
+const { registerSchema, loginSchema } = require("../../schema/validatorSchema");
 const { findUser } = require("../../db/authQueries");
 
 const validRegisterBody = {
@@ -178,5 +178,119 @@ describe("registerSchema", () => {
       expect(error).toBeDefined();
       expect(error.path).toContain("confirmPassword");
     });
+  });
+});
+
+describe("loginSchema", () => {
+  const validLoginBody = {
+    email: "john@example.com",
+    password: "somepassword",
+  };
+
+  test("passes with valid data", async () => {
+    const result = await loginSchema.safeParseAsync({ body: validLoginBody });
+    expect(result.success).toBe(true);
+  });
+
+  describe("email", () => {
+    test("trims whitespace before format validation", async () => {
+      const result = await loginSchema.safeParseAsync({
+        body: { ...validLoginBody, email: "  john@example.com  " },
+      });
+      expect(result.success).toBe(true);
+      expect(result.data.body.email).toBe("john@example.com");
+    });
+
+    test("lowercases the email", async () => {
+      const result = await loginSchema.safeParseAsync({
+        body: { ...validLoginBody, email: "John.Doe@EXAMPLE.com" },
+      });
+      expect(result.success).toBe(true);
+      expect(result.data.body.email).toBe("john.doe@example.com");
+    });
+
+    test("rejects empty email", async () => {
+      const result = await loginSchema.safeParseAsync({
+        body: { ...validLoginBody, email: "" },
+      });
+      expect(result.success).toBe(false);
+      const error = result.error.issues.find((i) => i.path.includes("email"));
+      expect(error.message).toBe("Email is Required.");
+    });
+
+    test("rejects invalid email format", async () => {
+      const result = await loginSchema.safeParseAsync({
+        body: { ...validLoginBody, email: "not-an-email" },
+      });
+      expect(result.success).toBe(false);
+      const error = result.error.issues.find((i) => i.path.includes("email"));
+      expect(error.message).toBe("Email is invalid");
+    });
+
+    test("rejects email over 100 characters", async () => {
+      const longEmail = "a".repeat(95) + "@test.com"; // > 100 chars total
+      const result = await loginSchema.safeParseAsync({
+        body: { ...validLoginBody, email: longEmail },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    test("does NOT perform an emailExists DB check (login is not registration)", async () => {
+      const result = await loginSchema.safeParseAsync({
+        body: {
+          ...validLoginBody,
+          email: "definitely-not-registered@example.com",
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("password", () => {
+    test("rejects empty password", async () => {
+      const result = await loginSchema.safeParseAsync({
+        body: { ...validLoginBody, password: "" },
+      });
+      expect(result.success).toBe(false);
+      const error = result.error.issues.find((i) =>
+        i.path.includes("password"),
+      );
+      expect(error.message).toBe("Password is require");
+    });
+
+    test("rejects password over 32 characters", async () => {
+      const result = await loginSchema.safeParseAsync({
+        body: { ...validLoginBody, password: "a".repeat(33) },
+      });
+      expect(result.success).toBe(false);
+      const error = result.error.issues.find((i) =>
+        i.path.includes("password"),
+      );
+      expect(error.message).toBe("Let's not enter too large password");
+    });
+
+    test("accepts a single-character password (no complexity rules enforced on login)", async () => {
+      const result = await loginSchema.safeParseAsync({
+        body: { ...validLoginBody, password: "a" },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    test("accepts exactly 32 characters (boundary)", async () => {
+      const result = await loginSchema.safeParseAsync({
+        body: { ...validLoginBody, password: "a".repeat(32) },
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  test("returns errors for both email and password when both are invalid", async () => {
+    const result = await loginSchema.safeParseAsync({
+      body: { email: "not-an-email", password: "" },
+    });
+    expect(result.success).toBe(false);
+    const paths = result.error.issues.map((i) => i.path.join("."));
+    expect(paths).toContain("body.email");
+    expect(paths).toContain("body.password");
   });
 });
