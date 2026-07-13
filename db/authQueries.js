@@ -58,6 +58,47 @@ async function createRefreshToken({ userId, tokenHash, expiresAt, family }) {
   });
 }
 
+async function createEmailVerification(tokenHash, userId) {
+  await prisma.emailVerificationToken.create({
+    data: {
+      token: tokenHash,
+      userId,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    },
+  });
+}
+
+async function findVerificationToken(token) {
+  const user = await prisma.emailVerificationToken.findUnique({
+    where: {
+      token,
+    },
+    include: {
+      user: true,
+    },
+  });
+  return user;
+}
+
+async function updateAndDeleteVerificationToken(verification) {
+  await prisma.$transaction([
+    prisma.user.update({
+      where: {
+        id: verification.userId,
+      },
+      data: {
+        emailVerified: true,
+      },
+    }),
+
+    prisma.emailVerificationToken.delete({
+      where: {
+        id: verification.id,
+      },
+    }),
+  ]);
+}
+
 async function findUserFromApi(apikey) {
   const user = await prisma.apikey.findFirst({
     select: {
@@ -135,8 +176,11 @@ module.exports = {
   generateApikey,
   createCompanyAndUser,
   findUser,
+  findVerificationToken,
   createRefreshToken,
   findRefreshToken,
   updateTokenStatus,
   rotateRefreshToken,
+  createEmailVerification,
+  updateAndDeleteVerificationToken,
 };

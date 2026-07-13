@@ -27,6 +27,12 @@ function generatedRefreshToken() {
   return { refreshToken, refreshTokenHash };
 }
 
+function generateToken() {
+  const token = crypto.randomBytes(64).toString("hex");
+  const tokenHash = hashString(token);
+  return { token, tokenHash };
+}
+
 const refreshCookieOptions = {
   httpOnly: true,
   secure: isProd,
@@ -46,6 +52,7 @@ function refreshExpiry() {
 module.exports = {
   getAccessToken,
   generatedRefreshToken,
+  generateToken,
   refreshCookieOptions,
   hashString,
   refreshExpiry,

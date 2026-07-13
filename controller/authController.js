@@ -6,14 +6,20 @@ const {
   findRefreshToken,
   updateTokenStatus,
   rotateRefreshToken,
+  createEmailVerification,
+  findVerificationToken,
+  updateAndDeleteVerificationToken,
 } = require("../db/authQueries");
 const {
   getAccessToken,
   generatedRefreshToken,
+  generateToken,
   refreshCookieOptions,
   refreshExpiry,
   hashString,
 } = require("../utils/token");
+
+const sendVerificationEmail = require("../services/email");
 
 async function postRegister(req, res) {
   try {
@@ -28,14 +34,13 @@ async function postRegister(req, res) {
       companyName,
       hashedPassword,
     };
-    const { newUser, company } = await createCompanyAndUser(user);
+    const { newUser } = await createCompanyAndUser(user);
     if (!newUser)
       return res.status(400).json({ message: "error in creating user" });
-    return res.status(201).json({
-      newUser,
-      company,
-      message: "Registered Successfully",
-    });
+    const { token, tokenHash } = generateToken();
+    await createEmailVerification(tokenHash, newUser.id);
+    await sendVerificationEmail(email, token);
+    return res.status(201).json({ message: "user registered successfully" });
   } catch (err) {
     if (err.code === "P2002") {
       return res.status(409).json({ message: "Email already taken" });
@@ -71,6 +76,39 @@ async function postLogin(req, res) {
       .json({ accessToken });
   } catch (err) {
     console.error(err);
+    return res.status(500).json({
+      message: "Internal Server Error",
+    });
+  }
+}
+
+async function postVerifyEmail(req, res) {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({
+        message: "Verification token is required.",
+      });
+    }
+    const tokenHash = hashString(token);
+    const verification = await findVerificationToken(tokenHash);
+    if (!verification) {
+      return res.status(400).json({
+        message: "Invalid Token",
+      });
+    }
+    if (verification.expiresAt < new Date()) {
+      return res.status(400).json({
+        message: "Verification token has expired.",
+      });
+    }
+    await updateAndDeleteVerificationToken(verification);
+    return res.status(200).json({
+      message: "Email verified successfully.",
+    });
+  } catch (err) {
+    console.error(err);
+
     return res.status(500).json({
       message: "Internal Server Error",
     });
@@ -124,4 +162,10 @@ async function postLogout(req, res) {
   }
 }
 
-module.exports = { postRegister, postLogin, postRefreshToken, postLogout };
+module.exports = {
+  postRegister,
+  postLogin,
+  postRefreshToken,
+  postLogout,
+  postVerifyEmail,
+};

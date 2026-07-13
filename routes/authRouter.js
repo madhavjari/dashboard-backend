@@ -17,6 +17,8 @@ authRouter.post(
   authController.postLogin,
 );
 
+authRouter.post("/api/auth/verify-email", authController.postVerifyEmail);
+
 authRouter.post("/api/auth/refresh", authController.postRefreshToken);
 
 authRouter.post("/api/auth/logout", authController.postLogout);
