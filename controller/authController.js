@@ -10,6 +10,8 @@ const {
   findVerificationToken,
   updateAndDeleteVerificationToken,
   deleteVerificationToken,
+  deletePasswordToken,
+  createPasswordReset,
 } = require("../db/authQueries");
 const {
   getAccessToken,
@@ -22,7 +24,10 @@ const {
 
 const { sendWithRetry } = require("../utils/sendWithRetry");
 
-const sendVerificationEmail = require("../services/email");
+const {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+} = require("../services/email");
 
 async function postRegister(req, res) {
   try {
@@ -153,6 +158,77 @@ async function postVerifyEmail(req, res) {
   }
 }
 
+async function postForgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+
+    const user = await findUser(["id"], { email });
+
+    if (!user) {
+      return res.status(200).json({
+        message:
+          "If an account exists with that email, a reset link has been sent.",
+      });
+    }
+
+    const { token, tokenHash } = generateToken();
+
+    await deletePasswordToken(user.id);
+
+    await createPasswordReset(tokenHash, user.id);
+    try {
+      await sendWithRetry(() => sendPasswordResetEmail(email, token));
+    } catch (err) {
+      console.error("Password Reset failed after retries:", err);
+    }
+
+    return res.status(200).json({
+      message:
+        "If an account exists with that email, a reset link has been sent.",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      message: "Internal Server Error",
+    });
+  }
+}
+
+async function postResetPassword(req, res) {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({
+        message: "Verification token/Password is required.",
+      });
+    }
+    const tokenHash = hashString(token);
+    const reset = await findPasswordResetToken(tokenHash);
+    if (!reset) {
+      return res.status(400).json({
+        message: "Invalid Token",
+      });
+    }
+    if (reset.expiresAt < new Date()) {
+      return res.status(400).json({
+        message: "Reset token has expired.",
+      });
+    }
+    const hashedPassword = await argon2.hash(password);
+
+    await updateAndDeletePasswordResetToken(reset, hashedPassword);
+    return res.status(200).json({
+      message: "Password Reset successfully.",
+    });
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      message: "Internal Server Error",
+    });
+  }
+}
+
 async function postRefreshToken(req, res) {
   try {
     const presentedToken = req.cookies?.refresh_token;
@@ -207,4 +283,6 @@ module.exports = {
   postLogout,
   postVerifyEmail,
   postResendVerification,
+  postForgotPassword,
+  postResetPassword,
 };

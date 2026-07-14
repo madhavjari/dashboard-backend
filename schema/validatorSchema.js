@@ -2,6 +2,23 @@ const { z } = require("zod");
 
 const { findUser } = require("../db/authQueries");
 
+const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(32, "Password must have less than 32 characters")
+  .regex(/[A-Z]/, {
+    message: "Password must contain at least one uppercase letter",
+  })
+  .regex(/[a-z]/, {
+    message: "Password must contain at least one lowercase letter",
+  })
+  .regex(/[0-9]/, {
+    message: "Password must contain at least one number",
+  })
+  .regex(/[^A-Za-z0-9]/, {
+    message: "Password must contain at least one special character",
+  });
+
 const registerSchema = z.object({
   body: z
     .object({
@@ -40,22 +57,7 @@ const registerSchema = z.object({
             "Security alert: Must be a valid +91 country code followed by 10 digits.",
         })
         .pipe(z.e164()),
-      password: z
-        .string()
-        .min(8, "Password must be at least 8 characters")
-        .max(32, "Password must have less than 32 characters")
-        .regex(/[A-Z]/, {
-          message: "Password must contain at least one uppercase letter",
-        })
-        .regex(/[a-z]/, {
-          message: "Password must contain at least one lowercase letter",
-        })
-        .regex(/[0-9]/, {
-          message: "Password must contain at least one number",
-        })
-        .regex(/[^A-Za-z0-9]/, {
-          message: "Password must contain at least one special character",
-        }),
+      password: passwordSchema,
       confirmPassword: z.string(),
     })
     .refine((data) => data.password === data.confirmPassword, {
@@ -79,4 +81,27 @@ const loginSchema = z.object({
       .max(32, "Let's not enter too large password"),
   }),
 });
-module.exports = { registerSchema, loginSchema };
+
+const passwordResetSchema = z.object({
+  body: z
+    .object({
+      password: passwordSchema,
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: "Passwords do not match",
+      path: ["confirmPassword"],
+    }),
+});
+
+const emailSchema = z.object({
+  body: z.object({
+    email: z.string().trim().toLowerCase().pipe(z.email()),
+  }),
+});
+module.exports = {
+  registerSchema,
+  loginSchema,
+  emailSchema,
+  passwordResetSchema,
+};

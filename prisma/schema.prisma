@@ -37,9 +37,10 @@ model User{
   companies   CompanyUser[]
   RefreshToken  RefreshToken[]
   emailVerified Boolean     @default(false)
-  emailVerificationTokens EmailVerificationToken[]
+  EmailVerificationTokens EmailVerificationToken[]
   phoneVerified Boolean     @default(false)
-  phoneVerificationTokens phoneVerificationToken[]  
+  PhoneVerificationTokens PhoneVerificationToken[]  
+  PasswordReset PasswordReset[]
   apikey      Apikey?              
 }
 
@@ -65,6 +66,16 @@ model phoneVerificationToken {
 
   userId    String
   user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 }

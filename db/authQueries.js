@@ -107,6 +107,57 @@ async function deleteVerificationToken(userId) {
   });
 }
 
+async function createPasswordReset(tokenHash, userId) {
+  await prisma.passwordReset.create({
+    data: {
+      tokenHash,
+      userId,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 30), // 30 mins
+    },
+  });
+}
+
+async function findPasswordResetToken(tokenHash) {
+  const user = await prisma.passwordReset.findUnique({
+    where: {
+      tokenHash,
+    },
+    include: {
+      user: true,
+    },
+  });
+  return user;
+}
+
+async function updateAndDeletePasswordResetToken(reset, hashedPassword) {
+  await prisma.$transaction([
+    prisma.user.update({
+      where: {
+        id: reset.userId,
+      },
+      data: {
+        password: hashedPassword,
+      },
+    }),
+
+    prisma.passwordReset.delete({
+      where: {
+        id: reset.id,
+      },
+    }),
+    prisma.refreshToken.updateMany({
+      where: { userId: reset.userId },
+      data: { revoked: true },
+    }),
+  ]);
+}
+
+async function deletePasswordToken(userId) {
+  await prisma.passwordReset.deleteMany({
+    where: { userId },
+  });
+}
+
 async function findUserFromApi(apikey) {
   const user = await prisma.apikey.findFirst({
     select: {
@@ -192,4 +243,8 @@ module.exports = {
   createEmailVerification,
   updateAndDeleteVerificationToken,
   deleteVerificationToken,
+  createPasswordReset,
+  deletePasswordToken,
+  findPasswordResetToken,
+  updateAndDeletePasswordResetToken,
 };
