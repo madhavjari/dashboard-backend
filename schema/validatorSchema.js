@@ -85,6 +85,7 @@ const loginSchema = z.object({
 const passwordResetSchema = z.object({
   body: z
     .object({
+      token: z.string(),
       password: passwordSchema,
       confirmPassword: z.string(),
     })

@@ -37,7 +37,7 @@ authRouter.post(
 );
 
 authRouter.post(
-  "api/auth/reset-password",
+  "/api/auth/reset-password",
   validate(passwordResetSchema),
   authController.postResetPassword,
 );

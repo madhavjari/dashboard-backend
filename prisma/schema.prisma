@@ -57,7 +57,7 @@ model EmailVerificationToken {
   createdAt DateTime @default(now())
 }
 
-model phoneVerificationToken {
+model PhoneVerificationToken {
   id        String   @id @default(cuid())
 
   token     String   @unique

@@ -12,6 +12,8 @@ const {
   deleteVerificationToken,
   deletePasswordToken,
   createPasswordReset,
+  findPasswordResetToken,
+  updateAndDeletePasswordResetToken,
 } = require("../db/authQueries");
 const {
   getAccessToken,
