@@ -48,6 +48,7 @@ async function postRegister(req, res) {
     if (!newUser)
       return res.status(400).json({ message: "error in creating user" });
     const { token, tokenHash } = generateToken();
+    if (!token) return res.status(400).json({ message: "Token not generated" });
     await createEmailVerification(tokenHash, newUser.id);
     try {
       await sendWithRetry(() => sendVerificationEmail(email, token));
@@ -110,6 +111,7 @@ async function postResendVerification(req, res) {
     }
 
     const { token, tokenHash } = generateToken();
+    if (!token) return res.status(400).json({ message: "Token not generated" });
     await deleteVerificationToken(user.id);
     await createEmailVerification(tokenHash, user.id);
     try {
@@ -174,7 +176,7 @@ async function postForgotPassword(req, res) {
     }
 
     const { token, tokenHash } = generateToken();
-
+    if (!token) return res.status(400).json({ message: "Token not generated" });
     await deletePasswordToken(user.id);
 
     await createPasswordReset(tokenHash, user.id);
