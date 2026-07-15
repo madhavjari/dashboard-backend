@@ -1,5 +1,10 @@
 jest.mock("../../db/authQueries");
-const { registerSchema, loginSchema } = require("../../schema/validatorSchema");
+const {
+  registerSchema,
+  loginSchema,
+  emailSchema,
+  passwordResetSchema,
+} = require("../../schema/validatorSchema");
 const { findUser } = require("../../db/authQueries");
 
 const validRegisterBody = {
@@ -292,5 +297,146 @@ describe("loginSchema", () => {
     const paths = result.error.issues.map((i) => i.path.join("."));
     expect(paths).toContain("body.email");
     expect(paths).toContain("body.password");
+  });
+});
+
+describe("passwordResetSchema", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  const validResetBody = {
+    token: "some-reset-token",
+    password: "Passw0rd!",
+    confirmPassword: "Passw0rd!",
+  };
+
+  test("passes with valid data", async () => {
+    const result = await passwordResetSchema.safeParseAsync({
+      body: validResetBody,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  describe("token", () => {
+    test("rejects when token is missing", async () => {
+      const { token, ...rest } = validResetBody;
+      const result = await passwordResetSchema.safeParseAsync({ body: rest });
+      expect(result.success).toBe(false);
+    });
+
+    test("rejects when token is not a string", async () => {
+      const result = await passwordResetSchema.safeParseAsync({
+        body: { ...validResetBody, token: 12345 },
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("password", () => {
+    const cases = [
+      ["too short", "Pw0!"],
+      ["missing uppercase", "password0!"],
+      ["missing lowercase", "PASSWORD0!"],
+      ["missing number", "Password!"],
+      ["missing special char", "Password0"],
+      ["too long", "P" + "a".repeat(30) + "0!"],
+    ];
+
+    test.each(cases)(
+      "rejects password that is %s",
+      async (_label, password) => {
+        const result = await passwordResetSchema.safeParseAsync({
+          body: { ...validResetBody, password, confirmPassword: password },
+        });
+        expect(result.success).toBe(false);
+      },
+    );
+
+    test("accepts a valid strong password", async () => {
+      const result = await passwordResetSchema.safeParseAsync({
+        body: {
+          ...validResetBody,
+          password: "Str0ng!Pw",
+          confirmPassword: "Str0ng!Pw",
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("confirmPassword", () => {
+    test("rejects when passwords do not match", async () => {
+      const result = await passwordResetSchema.safeParseAsync({
+        body: { ...validResetBody, confirmPassword: "Different0!" },
+      });
+      expect(result.success).toBe(false);
+      const error = result.error.issues.find(
+        (i) => i.message === "Passwords do not match",
+      );
+      expect(error).toBeDefined();
+      expect(error.path).toContain("confirmPassword");
+    });
+  });
+
+  test("does not check findUser/email at all (no email field in this schema)", async () => {
+    await passwordResetSchema.safeParseAsync({ body: validResetBody });
+    expect(findUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("emailSchema", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  test("passes with a valid email", async () => {
+    const result = await emailSchema.safeParseAsync({
+      body: { email: "john@example.com" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("trims whitespace before format validation", async () => {
+    const result = await emailSchema.safeParseAsync({
+      body: { email: "  john@example.com  " },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data.body.email).toBe("john@example.com");
+  });
+
+  test("lowercases the email", async () => {
+    const result = await emailSchema.safeParseAsync({
+      body: { email: "John.Doe@EXAMPLE.com" },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data.body.email).toBe("john.doe@example.com");
+  });
+
+  test("rejects invalid email format", async () => {
+    const result = await emailSchema.safeParseAsync({
+      body: { email: "not-an-email" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test("rejects when email is missing", async () => {
+    const result = await emailSchema.safeParseAsync({
+      body: { email: "" },
+    });
+    expect(result.success).toBe(false);
+    const error = result.error.issues.find((i) => i.path.includes("email"));
+    expect(error.message).toBe("Email is required");
+  });
+
+  test("rejects when email length is greater than 100", async () => {
+    const longButValidEmail = "a".repeat(100) + "@example.com";
+    const result = await emailSchema.safeParseAsync({
+      body: { email: longButValidEmail },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test("does not perform a findUser check (schema is DB-agnostic)", async () => {
+    await emailSchema.safeParseAsync({ body: { email: "john@example.com" } });
+    expect(findUser).not.toHaveBeenCalled();
   });
 });

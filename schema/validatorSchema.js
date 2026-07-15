@@ -85,7 +85,7 @@ const loginSchema = z.object({
 const passwordResetSchema = z.object({
   body: z
     .object({
-      token: z.string(),
+      token: z.string().min(1, "Token is required."),
       password: passwordSchema,
       confirmPassword: z.string(),
     })
@@ -97,7 +97,13 @@ const passwordResetSchema = z.object({
 
 const emailSchema = z.object({
   body: z.object({
-    email: z.string().trim().toLowerCase().pipe(z.email()),
+    email: z
+      .string()
+      .min(1, "Email is required")
+      .max(100, "Email must be less than 100 characters")
+      .trim()
+      .toLowerCase()
+      .pipe(z.email()),
   }),
 });
 module.exports = {
