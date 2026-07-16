@@ -108,7 +108,7 @@ const emailSchema = z.object({
 });
 
 const tokenSchema = z.object({
-  body: z.object({
+  query: z.object({
     token: z.string().min(1, "Token is required"),
   }),
 });

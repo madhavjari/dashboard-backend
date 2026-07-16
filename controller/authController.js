@@ -135,7 +135,7 @@ async function postResendVerification(req, res) {
 
 async function postVerifyEmail(req, res) {
   try {
-    const { token } = req.body;
+    const { token } = req.query;
     if (!token) {
       return res.status(400).json({
         message: "Verification token is required.",
