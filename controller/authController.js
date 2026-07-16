@@ -56,7 +56,10 @@ async function postRegister(req, res) {
     } catch (err) {
       console.error("Verification email failed after retries:", err);
     }
-    return res.status(201).json({ message: "user registered successfully" });
+    return res.status(201).json({
+      message:
+        "user registered successfully, verification email has been sent to your mail",
+    });
   } catch (err) {
     if (err.code === "P2002") {
       return res.status(409).json({ message: "Email already taken" });
