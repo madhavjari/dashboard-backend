@@ -106,9 +106,17 @@ const emailSchema = z.object({
       .pipe(z.email()),
   }),
 });
+
+const tokenSchema = z.object({
+  body: z.object({
+    token: z.string().min(1, "Token is required"),
+  }),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
   emailSchema,
   passwordResetSchema,
+  tokenSchema,
 };

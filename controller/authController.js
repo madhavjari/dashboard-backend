@@ -1,4 +1,5 @@
 const argon2 = require("argon2");
+const crypto = require("node:crypto");
 const {
   createCompanyAndUser,
   findUser,
@@ -73,12 +74,12 @@ async function postLogin(req, res) {
       { email: email },
     );
     if (!user) {
-      return res.status(401).json({ message: "Invalid username or password" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
     const match = await argon2.verify(user.password, password);
     if (!match) {
       return res.status(401).json({
-        message: "Invalid username or Password",
+        message: "Invalid email or password",
       });
     }
     const accessToken = getAccessToken(user.id);

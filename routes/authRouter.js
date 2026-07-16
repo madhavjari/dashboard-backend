@@ -6,6 +6,7 @@ const {
   loginSchema,
   emailSchema,
   passwordResetSchema,
+  tokenSchema,
 } = require("../schema/validatorSchema");
 
 const authRouter = Router();
@@ -22,7 +23,11 @@ authRouter.post(
   authController.postLogin,
 );
 
-authRouter.post("/api/auth/verify-email", authController.postVerifyEmail);
+authRouter.post(
+  "/api/auth/verify-email",
+  validate(tokenSchema),
+  authController.postVerifyEmail,
+);
 
 authRouter.post(
   "/api/auth/resend-verification",
