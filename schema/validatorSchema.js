@@ -83,9 +83,11 @@ const loginSchema = z.object({
 });
 
 const passwordResetSchema = z.object({
+  query: z.object({
+    token: z.string().min(1, "Token is required"),
+  }),
   body: z
     .object({
-      token: z.string().min(1, "Token is required."),
       password: passwordSchema,
       confirmPassword: z.string(),
     })

@@ -202,9 +202,32 @@ async function postForgotPassword(req, res) {
   }
 }
 
+async function postVerifyPasswordResetToken(req, res) {
+  const { token } = req.query;
+  try {
+    const tokenHash = hashString(token);
+    const reset = await findPasswordResetToken(tokenHash);
+    if (!reset) {
+      return res.status(400).json({
+        message: "Invalid Token",
+      });
+    }
+    if (reset.expiresAt < new Date()) {
+      return res.status(400).json({
+        message: "Reset token has expired.",
+      });
+    }
+    return res.status(200).json({ message: "Token is valid" });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 async function postResetPassword(req, res) {
   try {
-    const { token, password } = req.body;
+    const { token } = req.query;
+    const { password } = req.body;
     if (!token || !password) {
       return res.status(400).json({
         message: "Verification token/Password is required.",
@@ -293,4 +316,5 @@ module.exports = {
   postResendVerification,
   postForgotPassword,
   postResetPassword,
+  postVerifyPasswordResetToken,
 };

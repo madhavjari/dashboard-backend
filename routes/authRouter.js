@@ -42,6 +42,12 @@ authRouter.post(
 );
 
 authRouter.post(
+  "/api/auth/verify-password-reset-token",
+  validate(tokenSchema),
+  authController.postVerifyPasswordResetToken,
+);
+
+authRouter.post(
   "/api/auth/reset-password",
   validate(passwordResetSchema),
   authController.postResetPassword,
