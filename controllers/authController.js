@@ -72,10 +72,9 @@ async function postRegister(req, res) {
 async function postLogin(req, res) {
   const { email, password } = req.body;
   try {
-    const user = await findUser(
-      ["id", "email", "password", ["emailVerified"]],
-      { email: email },
-    );
+    const user = await findUser(["id", "email", "password", "emailVerified"], {
+      email: email,
+    });
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }

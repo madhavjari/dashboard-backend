@@ -1,5 +1,5 @@
 const { Router } = require("express");
-const authController = require("../controller/authController");
+const authController = require("../controllers/authController");
 const { validate } = require("../middleware/zodValidator");
 const {
   registerSchema,

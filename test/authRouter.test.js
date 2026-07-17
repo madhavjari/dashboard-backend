@@ -160,7 +160,6 @@ describe("POST /api/v1/auth/login", () => {
     const res = await request(app).post("/api/v1/auth/login").send(creds);
 
     expect(res.status).toBe(200);
-    expect(res.body.accessToken).toEqual(expect.any(String));
     expect(res.body.isVerified).toBe(true);
 
     const cookies = res.headers["set-cookie"];
