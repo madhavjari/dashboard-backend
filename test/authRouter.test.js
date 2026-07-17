@@ -1,12 +1,10 @@
 const request = require("supertest");
-const express = require("express");
-const cookieParser = require("cookie-parser");
 
 process.env.JWT_SECRET_KEY = "test-secret";
 process.env.JWT_ISSUER = "test-issuer";
 process.env.JWT_AUDIENCE = "test-audience";
 process.env.NODE_ENV = "test";
-process.env.CLIENT_URL = "http://localhost:3000";
+process.env.CLIENT_URL = "http://localhost:5000";
 process.env.EMAIL_FROM = "noreply@test.com";
 process.env.RESEND_API_KEY = "test-key";
 
@@ -23,7 +21,6 @@ const {
   sendVerificationEmail,
   sendPasswordResetEmail,
 } = require("../services/email");
-const authRouter = require("../routes/authRouter");
 const { hashString } = require("../utils/token");
 
 const app = require("../app");
@@ -41,7 +38,7 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-describe("POST /api/auth/register", () => {
+describe("POST /api/v1/auth/register", () => {
   it("registers successfully with a valid, unique payload", async () => {
     db.findUser.mockResolvedValue(null); // used by schema refine (email uniqueness)
     db.createCompanyAndUser.mockResolvedValue({ newUser: { id: "user_1" } });
@@ -50,7 +47,7 @@ describe("POST /api/auth/register", () => {
     argon2.hash.mockResolvedValue("hashed_pw");
 
     const res = await request(app)
-      .post("/api/auth/register")
+      .post("/api/v1/auth/register")
       .send(validRegisterBody);
 
     expect(res.status).toBe(201);
@@ -67,7 +64,7 @@ describe("POST /api/auth/register", () => {
   });
 
   it("returns 400 with per-field errors on an invalid payload", async () => {
-    const res = await request(app).post("/api/auth/register").send({
+    const res = await request(app).post("/api/v1/auth/register").send({
       firstName: "A", // too short
       lastName: "Lovelace",
       email: "not-an-email",
@@ -96,7 +93,7 @@ describe("POST /api/auth/register", () => {
     db.findUser.mockResolvedValue({ id: "existing_user" }); // refine sees a match
 
     const res = await request(app)
-      .post("/api/auth/register")
+      .post("/api/v1/auth/register")
       .send(validRegisterBody);
 
     expect(res.status).toBe(400);
@@ -108,7 +105,7 @@ describe("POST /api/auth/register", () => {
 
   it("returns 400 when passwords don't match", async () => {
     const res = await request(app)
-      .post("/api/auth/register")
+      .post("/api/v1/auth/register")
       .send({ ...validRegisterBody, confirmPassword: "Different1!" });
 
     expect(res.status).toBe(400);
@@ -125,7 +122,7 @@ describe("POST /api/auth/register", () => {
     argon2.hash.mockResolvedValue("hashed_pw");
 
     const res = await request(app)
-      .post("/api/auth/register")
+      .post("/api/v1/auth/register")
       .send(validRegisterBody);
 
     expect(res.status).toBe(409);
@@ -140,14 +137,14 @@ describe("POST /api/auth/register", () => {
     sendVerificationEmail.mockRejectedValue(new Error("resend down"));
 
     const res = await request(app)
-      .post("/api/auth/register")
+      .post("/api/v1/auth/register")
       .send(validRegisterBody);
 
     expect(res.status).toBe(201);
   });
 });
 
-describe("POST /api/auth/login", () => {
+describe("POST /api/v1/auth/login", () => {
   const creds = { email: "ada@example.com", password: "Str0ng!Pass" };
 
   it("logs in successfully: 200, accessToken in body, refresh cookie set", async () => {
@@ -160,7 +157,7 @@ describe("POST /api/auth/login", () => {
     argon2.verify.mockResolvedValue(true);
     db.createRefreshToken.mockResolvedValue(true);
 
-    const res = await request(app).post("/api/auth/login").send(creds);
+    const res = await request(app).post("/api/v1/auth/login").send(creds);
 
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toEqual(expect.any(String));
@@ -176,7 +173,7 @@ describe("POST /api/auth/login", () => {
   it("returns 401 with a generic message when the user doesn't exist", async () => {
     db.findUser.mockResolvedValue(null);
 
-    const res = await request(app).post("/api/auth/login").send(creds);
+    const res = await request(app).post("/api/v1/auth/login").send(creds);
 
     expect(res.status).toBe(401);
     expect(res.body.message).toMatch(/invalid/i);
@@ -191,9 +188,9 @@ describe("POST /api/auth/login", () => {
     });
     argon2.verify.mockResolvedValue(false);
 
-    const res = await request(app).post("/api/auth/login").send(creds);
+    const res = await request(app).post("/api/v1/auth/login").send(creds);
     const notFoundRes = await request(app)
-      .post("/api/auth/login")
+      .post("/api/v1/auth/login")
       .send({ ...creds, email: "nobody@example.com" });
 
     expect(res.status).toBe(401);
@@ -204,7 +201,7 @@ describe("POST /api/auth/login", () => {
 
   it("returns 400 on malformed login payload", async () => {
     const res = await request(app)
-      .post("/api/auth/login")
+      .post("/api/v1/auth/login")
       .send({ email: "bad", password: "" });
     expect(res.status).toBe(400);
     expect(res.body.errors).toHaveProperty("email");
@@ -212,17 +209,17 @@ describe("POST /api/auth/login", () => {
   });
 });
 
-describe("POST /api/auth/verify-email", () => {
+describe("POST /api/v1/auth/verify-email", () => {
   it("returns 400 when token is missing", async () => {
-    const res = await request(app).post("/api/auth/verify-email").send({});
+    const res = await request(app).post("/api/v1/auth/verify-email").send({});
     expect(res.status).toBe(400);
   });
 
   it("returns 400 for an invalid/unknown token", async () => {
     db.findVerificationToken.mockResolvedValue(null);
     const res = await request(app)
-      .post("/api/auth/verify-email")
-      .send({ token: "bogus" });
+      .post("/api/v1/auth/verify-email")
+      .query({ token: "bogus" });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/invalid token/i);
   });
@@ -232,8 +229,8 @@ describe("POST /api/auth/verify-email", () => {
       expiresAt: new Date(Date.now() - 1000),
     });
     const res = await request(app)
-      .post("/api/auth/verify-email")
-      .send({ token: "expired" });
+      .post("/api/v1/auth/verify-email")
+      .query({ token: "expired" });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/expired/i);
   });
@@ -244,8 +241,8 @@ describe("POST /api/auth/verify-email", () => {
     db.updateAndDeleteVerificationToken.mockResolvedValue(true);
 
     const res = await request(app)
-      .post("/api/auth/verify-email")
-      .send({ token: "good-token" });
+      .post("/api/v1/auth/verify-email")
+      .query({ token: "good-token" });
 
     expect(res.status).toBe(200);
     expect(db.updateAndDeleteVerificationToken).toHaveBeenCalledWith(
@@ -254,10 +251,10 @@ describe("POST /api/auth/verify-email", () => {
   });
 });
 
-describe("POST /api/auth/resend-verification", () => {
+describe("POST /api/v1/auth/resend-verification", () => {
   it("returns 400 on invalid email format", async () => {
     const res = await request(app)
-      .post("/api/auth/resend-verification")
+      .post("/api/v1/auth/resend-verification")
       .send({ email: "not-an-email" });
     expect(res.status).toBe(400);
     expect(res.body.errors).toHaveProperty("email");
@@ -266,7 +263,7 @@ describe("POST /api/auth/resend-verification", () => {
   it("returns generic 200 without sending email when user doesn't exist", async () => {
     db.findUser.mockResolvedValue(null);
     const res = await request(app)
-      .post("/api/auth/resend-verification")
+      .post("/api/v1/auth/resend-verification")
       .send({ email: "ghost@example.com" });
 
     expect(res.status).toBe(200);
@@ -276,7 +273,7 @@ describe("POST /api/auth/resend-verification", () => {
   it("returns generic 200 without sending email when user is already verified", async () => {
     db.findUser.mockResolvedValue({ id: "user_1", emailVerified: true });
     const res = await request(app)
-      .post("/api/auth/resend-verification")
+      .post("/api/v1/auth/resend-verification")
       .send({ email: "ada@example.com" });
 
     expect(res.status).toBe(200);
@@ -290,7 +287,7 @@ describe("POST /api/auth/resend-verification", () => {
     sendVerificationEmail.mockResolvedValue({ id: "email_1" });
 
     const res = await request(app)
-      .post("/api/auth/resend-verification")
+      .post("/api/v1/auth/resend-verification")
       .send({ email: "ada@example.com" });
 
     expect(res.status).toBe(200);
@@ -301,10 +298,10 @@ describe("POST /api/auth/resend-verification", () => {
   });
 });
 
-describe("POST /api/auth/forgot-password", () => {
+describe("POST /api/v1/auth/forgot-password", () => {
   it("returns 400 on invalid email format", async () => {
     const res = await request(app)
-      .post("/api/auth/forgot-password")
+      .post("/api/v1/auth/forgot-password")
       .send({ email: "nope" });
     expect(res.status).toBe(400);
   });
@@ -312,7 +309,7 @@ describe("POST /api/auth/forgot-password", () => {
   it("returns generic 200 without sending email when user doesn't exist", async () => {
     db.findUser.mockResolvedValue(null);
     const res = await request(app)
-      .post("/api/auth/forgot-password")
+      .post("/api/v1/auth/forgot-password")
       .send({ email: "ghost@example.com" });
 
     expect(res.status).toBe(200);
@@ -326,7 +323,7 @@ describe("POST /api/auth/forgot-password", () => {
     sendPasswordResetEmail.mockResolvedValue({ id: "email_2" });
 
     const res = await request(app)
-      .post("/api/auth/forgot-password")
+      .post("/api/v1/auth/forgot-password")
       .send({ email: "ada@example.com" });
 
     expect(res.status).toBe(200);
@@ -337,17 +334,18 @@ describe("POST /api/auth/forgot-password", () => {
   });
 });
 
-describe("POST /api/auth/reset-password", () => {
+describe("POST /api/v1/auth/reset-password", () => {
   const validBody = {
-    token: "reset-token",
     password: "N3wStr0ng!",
     confirmPassword: "N3wStr0ng!",
   };
+  const validQuery = { token: "Valid Token" };
 
   it("returns 400 when passwords don't match / fail complexity", async () => {
     const res = await request(app)
-      .post("/api/auth/reset-password")
-      .send({ token: "t", password: "weak", confirmPassword: "weak" });
+      .post("/api/v1/auth/reset-password")
+      .send({ password: "weak", confirmPassword: "weak" })
+      .query({ token: "t" });
     expect(res.status).toBe(400);
     expect(res.body.errors).toHaveProperty("password");
   });
@@ -355,8 +353,9 @@ describe("POST /api/auth/reset-password", () => {
   it("returns 400 for an invalid/unknown reset token", async () => {
     db.findPasswordResetToken.mockResolvedValue(null);
     const res = await request(app)
-      .post("/api/auth/reset-password")
-      .send(validBody);
+      .post("/api/v1/auth/reset-password")
+      .send(validBody)
+      .query(validQuery);
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/invalid token/i);
   });
@@ -366,8 +365,9 @@ describe("POST /api/auth/reset-password", () => {
       expiresAt: new Date(Date.now() - 1000),
     });
     const res = await request(app)
-      .post("/api/auth/reset-password")
-      .send(validBody);
+      .post("/api/v1/auth/reset-password")
+      .send(validBody)
+      .query(validQuery);
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/expired/i);
   });
@@ -379,8 +379,9 @@ describe("POST /api/auth/reset-password", () => {
     argon2.hash.mockResolvedValue("new_hashed_pw");
 
     const res = await request(app)
-      .post("/api/auth/reset-password")
-      .send(validBody);
+      .post("/api/v1/auth/reset-password")
+      .send(validBody)
+      .query(validQuery);
 
     expect(res.status).toBe(200);
     expect(db.updateAndDeletePasswordResetToken).toHaveBeenCalledWith(
@@ -390,16 +391,16 @@ describe("POST /api/auth/reset-password", () => {
   });
 });
 
-describe("POST /api/auth/refresh", () => {
+describe("POST /api/v1/auth/refresh", () => {
   it("returns 401 when there is no refresh cookie", async () => {
-    const res = await request(app).post("/api/auth/refresh");
+    const res = await request(app).post("/api/v1/auth/refresh");
     expect(res.status).toBe(401);
   });
 
   it("returns 401 for an unknown/invalid refresh token", async () => {
     db.findRefreshToken.mockResolvedValue(null);
     const res = await request(app)
-      .post("/api/auth/refresh")
+      .post("/api/v1/auth/refresh")
       .set("Cookie", "refresh_token=garbage");
     expect(res.status).toBe(401);
   });
@@ -411,7 +412,7 @@ describe("POST /api/auth/refresh", () => {
       used: false,
     });
     const res = await request(app)
-      .post("/api/auth/refresh")
+      .post("/api/v1/auth/refresh")
       .set("Cookie", "refresh_token=expired");
     expect(res.status).toBe(401);
   });
@@ -427,7 +428,7 @@ describe("POST /api/auth/refresh", () => {
     });
 
     const res = await request(app)
-      .post("/api/auth/refresh")
+      .post("/api/v1/auth/refresh")
       .set("Cookie", "refresh_token=reused");
 
     expect(res.status).toBe(401);
@@ -450,7 +451,7 @@ describe("POST /api/auth/refresh", () => {
     db.rotateRefreshToken.mockResolvedValue(true);
 
     const res = await request(app)
-      .post("/api/auth/refresh")
+      .post("/api/v1/auth/refresh")
       .set("Cookie", "refresh_token=valid_token");
 
     expect(res.status).toBe(200);
@@ -466,12 +467,12 @@ describe("POST /api/auth/refresh", () => {
   });
 });
 
-describe("POST /api/auth/logout", () => {
+describe("POST /api/v1/auth/logout", () => {
   it("returns 204 and revokes the token when a refresh cookie is present", async () => {
     db.updateTokenStatus.mockResolvedValue(true);
 
     const res = await request(app)
-      .post("/api/auth/logout")
+      .post("/api/v1/auth/logout")
       .set("Cookie", "refresh_token=some_token");
 
     expect(res.status).toBe(204);
@@ -483,7 +484,7 @@ describe("POST /api/auth/logout", () => {
   });
 
   it("returns 204 without error when there is no refresh cookie", async () => {
-    const res = await request(app).post("/api/auth/logout");
+    const res = await request(app).post("/api/v1/auth/logout");
     expect(res.status).toBe(204);
     expect(db.updateTokenStatus).not.toHaveBeenCalled();
   });

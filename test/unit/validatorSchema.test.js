@@ -305,21 +305,22 @@ describe("passwordResetSchema", () => {
     jest.clearAllMocks();
   });
   const validResetBody = {
-    token: "some-reset-token",
     password: "Passw0rd!",
     confirmPassword: "Passw0rd!",
   };
 
+  const validResetQuery = { token: "valid Token" };
   test("passes with valid data", async () => {
     const result = await passwordResetSchema.safeParseAsync({
       body: validResetBody,
+      query: validResetQuery,
     });
     expect(result.success).toBe(true);
   });
 
   describe("token", () => {
     test("rejects when token is missing", async () => {
-      const { token, ...rest } = validResetBody;
+      const { ...rest } = validResetBody;
       const result = await passwordResetSchema.safeParseAsync({ body: rest });
       expect(result.success).toBe(false);
     });
@@ -359,6 +360,7 @@ describe("passwordResetSchema", () => {
           password: "Str0ng!Pw",
           confirmPassword: "Str0ng!Pw",
         },
+        query: validResetQuery,
       });
       expect(result.success).toBe(true);
     });

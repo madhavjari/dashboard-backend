@@ -12,49 +12,49 @@ const {
 const authRouter = Router();
 
 authRouter.post(
-  "/api/auth/register",
+  "/api/v1/auth/register",
   validate(registerSchema),
   authController.postRegister,
 );
 
 authRouter.post(
-  "/api/auth/login",
+  "/api/v1/auth/login",
   validate(loginSchema),
   authController.postLogin,
 );
 
 authRouter.post(
-  "/api/auth/verify-email",
+  "/api/v1/auth/verify-email",
   validate(tokenSchema),
   authController.postVerifyEmail,
 );
 
 authRouter.post(
-  "/api/auth/resend-verification",
+  "/api/v1/auth/resend-verification",
   validate(emailSchema),
   authController.postResendVerification,
 );
 
 authRouter.post(
-  "/api/auth/forgot-password",
+  "/api/v1/auth/forgot-password",
   validate(emailSchema),
   authController.postForgotPassword,
 );
 
 authRouter.post(
-  "/api/auth/verify-password-reset-token",
+  "/api/v1/auth/verify-password-reset-token",
   validate(tokenSchema),
   authController.postVerifyPasswordResetToken,
 );
 
 authRouter.post(
-  "/api/auth/reset-password",
+  "/api/v1/auth/reset-password",
   validate(passwordResetSchema),
   authController.postResetPassword,
 );
 
-authRouter.post("/api/auth/refresh", authController.postRefreshToken);
+authRouter.post("/api/v1/auth/refresh", authController.postRefreshToken);
 
-authRouter.post("/api/auth/logout", authController.postLogout);
+authRouter.post("/api/v1/auth/logout", authController.postLogout);
 
 module.exports = authRouter;
