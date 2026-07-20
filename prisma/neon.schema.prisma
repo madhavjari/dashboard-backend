@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/neon"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model bills {
+  entry_id   BigInt    @id
+  bill_date  DateTime? @db.Date
+  code       String?
+  book       String?
+  party      String?
+  agent      String?
+  net_amt    Decimal?  @db.Decimal
+  cgst       Decimal?  @db.Decimal
+  sgst       Decimal?  @db.Decimal
+  igst       Decimal?  @db.Decimal
+  station    String?
+  transport  String?
+  created_at DateTime? @db.Timestamp(6)
+}

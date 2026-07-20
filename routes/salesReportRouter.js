@@ -4,12 +4,12 @@ const salesReportController = require("../controllers/salesReportController");
 const salesReportRouter = Router();
 
 salesReportRouter.get(
-  "/api/v1/reports/sales/items",
-  salesReportController.getItems,
+  "/api/v1/reports/sales/KPI-summary",
+  salesReportController.getKPISummary,
 );
 salesReportRouter.get(
   "/api/v1/reports/sales/customers",
-  salesReportController.getCustomers,
+  salesReportController.getCustomerWiseSales,
 );
 salesReportRouter.get(
   "/api/v1/reports/sales/trend",
