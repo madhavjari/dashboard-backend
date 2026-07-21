@@ -7,18 +7,46 @@ datasource db {
   provider = "postgresql"
 }
 
-model bills {
-  entry_id   BigInt    @id
-  bill_date  DateTime? @db.Date
-  code       String?
-  book       String?
-  party      String?
-  agent      String?
-  net_amt    Decimal?  @db.Decimal
-  cgst       Decimal?  @db.Decimal
-  sgst       Decimal?  @db.Decimal
-  igst       Decimal?  @db.Decimal
-  station    String?
-  transport  String?
-  created_at DateTime? @db.Timestamp(6)
+model sales_entries {
+  id           BigInt        @id @default(autoincrement())
+  entry_id     Int
+  comp_no      Int
+  code         String?       @db.VarChar(50)
+  bill_no      String?       @db.VarChar(100)
+  bill_date    DateTime?     @db.Date
+  party        String?       @db.VarChar(255)
+  party_code   String?       @db.VarChar(100)
+  agent        String?       @db.VarChar(255)
+  gross_amount Decimal?      @db.Decimal(18, 2)
+  net_amount   Decimal?      @db.Decimal(18, 2)
+  cgst         Decimal?      @default(0) @db.Decimal(18, 2)
+  sgst         Decimal?      @default(0) @db.Decimal(18, 2)
+  igst         Decimal?      @default(0) @db.Decimal(18, 2)
+  modify_date  DateTime?     @db.Date
+  modify_time  String?       @db.VarChar(50)
+  created_at   DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at   DateTime?     @default(now()) @db.Timestamp(6)
+  sales_items  sales_items[]
+
+  @@unique([entry_id, comp_no])
+}
+
+model sales_items {
+  id             BigInt        @id @default(autoincrement())
+  sales_entry_id BigInt
+  serial         String?       @db.VarChar(50)
+  item_code      String?       @db.VarChar(100)
+  item_name      String?       @db.VarChar(255)
+  category       String?       @db.VarChar(255)
+  item_group     String?       @db.VarChar(255)
+  pcs            Decimal?      @default(0) @db.Decimal(18, 3)
+  meters         Decimal?      @default(0) @db.Decimal(18, 3)
+  quantity       Decimal?      @default(0) @db.Decimal(18, 3)
+  weight         Decimal?      @default(0) @db.Decimal(18, 3)
+  rate           Decimal?      @default(0) @db.Decimal(18, 2)
+  amount         Decimal?      @default(0) @db.Decimal(18, 2)
+  taxable        Decimal?      @default(0) @db.Decimal(18, 2)
+  final_amount   Decimal?      @default(0) @db.Decimal(18, 2)
+  created_at     DateTime?     @default(now()) @db.Timestamp(6)
+  sales_entries  sales_entries @relation(fields: [sales_entry_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }

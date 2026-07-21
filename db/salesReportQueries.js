@@ -1,25 +1,78 @@
 const { neonprisma } = require("../lib/neon");
 
-async function getDateRangeSales(startDate, endDate) {
-  const data = await neonprisma.bills.findMany({
-    select: {
-      bill_date: true,
-      party: true,
-      net_amt: true,
-    },
+async function getItemWiseSummary(compNo = 1) {
+  const summary = await neonprisma.sales_items.aggregate({
     where: {
-      code: "S",
-      bill_date: {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
+      sales_entries: {
+        comp_no: compNo,
+        code: "S",
+      },
+    },
+    _sum: {
+      pcs: true,
+      meters: true,
+      weight: true,
+      amount: true,
+      taxable: true,
+      final_amount: true,
+    },
+    _count: {
+      id: true,
+    },
+  });
+  const uniqueItems = await neonprisma.sales_items.groupBy({
+    by: ["item_name"],
+    where: {
+      sales_entries: {
+        code: "S",
+        comp_no: compNo,
       },
     },
   });
-  return data;
+  const topItems = await neonprisma.sales_items.groupBy({
+    by: "item_name",
+    where: {
+      sales_entries: {
+        comp_no: compNo,
+        code: "S",
+      },
+    },
+    _sum: {
+      pcs: true,
+      meters: true,
+      weight: true,
+      amount: true,
+      final_amount: true,
+    },
+    orderBy: {
+      _sum: {
+        final_amount: "desc",
+      },
+    },
+    take: 10,
+  });
+
+  return {
+    summary: {
+      totalPcs: summary._sum.pcs ?? 0,
+      totalMeters: summary._sum.meters ?? 0,
+      totalWeight: summary._sum.weight ?? 0,
+      totalTaxable: summary._sum.taxable ?? 0,
+      totalSales: summary._sum.final_amount ?? 0,
+      totalUniqueItems: uniqueItems.length ?? 0,
+    },
+    topItems: topItems.map((item) => ({
+      itemName: item.item_name,
+      pcs: item._sum.pcs ?? 0,
+      meters: item._sum.meters ?? 0,
+      weight: item._sum.weight ?? 0,
+      revenue: item._sum.final_amount ?? 0,
+    })),
+  };
 }
 
 async function getSalesKPI(fromDate, toDate) {
-  const sales = await neonprisma.bills.aggregate({
+  const sales = await neonprisma.sales_entries.aggregate({
     where: {
       code: "S",
       bill_date: {
@@ -28,7 +81,7 @@ async function getSalesKPI(fromDate, toDate) {
       },
     },
     _sum: {
-      net_amt: true,
+      net_amount: true,
       cgst: true,
       sgst: true,
       igst: true,
@@ -37,8 +90,7 @@ async function getSalesKPI(fromDate, toDate) {
       entry_id: true,
     },
   });
-
-  const salesReturns = await neonprisma.bills.aggregate({
+  const salesReturns = await neonprisma.sales_entries.aggregate({
     where: {
       code: "SR",
       bill_date: {
@@ -47,7 +99,7 @@ async function getSalesKPI(fromDate, toDate) {
       },
     },
     _sum: {
-      net_amt: true,
+      net_amount: true,
       cgst: true,
       sgst: true,
       igst: true,
@@ -56,9 +108,9 @@ async function getSalesKPI(fromDate, toDate) {
       entry_id: true,
     },
   });
-  const grossSales = Number(sales._sum.net_amt ?? 0);
+  const grossSales = Number(sales._sum.net_amount ?? 0);
 
-  const returns = Number(salesReturns._sum.net_amt ?? 0);
+  const returns = Number(salesReturns._sum.net_amount ?? 0);
 
   const netSales = grossSales - returns;
 
@@ -92,28 +144,28 @@ async function getSalesByCustomer(fromDate, toDate) {
     party,
 
     COALESCE(
-      SUM(net_amt) FILTER (
+      SUM(net_amount) FILTER (
         WHERE code = 'S'
       ),
       0
     ) AS sales_amount,
 
     COALESCE(
-      SUM(net_amt) FILTER (
+      SUM(net_amount) FILTER (
         WHERE code = 'SR'
       ),
       0
     ) AS return_amount,
 
     COALESCE(
-      SUM(net_amt) FILTER (
+      SUM(net_amount) FILTER (
         WHERE code = 'S'
       ),
       0
     )
     -
     COALESCE(
-      SUM(net_amt) FILTER (
+      SUM(net_amount) FILTER (
         WHERE code = 'SR'
       ),
       0
@@ -123,7 +175,7 @@ async function getSalesByCustomer(fromDate, toDate) {
       WHERE code = 'S'
     ) AS invoice_count
 
-  FROM bills
+  FROM sales_entries
 
   WHERE code IN ('S', 'SR')
     AND bill_date >= ${fromDate}
@@ -147,7 +199,7 @@ async function getTrend(filters) {
 }
 
 module.exports = {
-  getDateRangeSales,
+  getItemWiseSummary,
   getSalesByCustomer,
   getTrend,
   getSalesKPI,
