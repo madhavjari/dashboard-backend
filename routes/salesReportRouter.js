@@ -15,6 +15,11 @@ salesReportRouter.get(
   "/api/v1/reports/sales/items",
   salesReportController.getItemWiseSales,
 );
+
+salesReportRouter.get(
+  "/api/v1/reports/sales/customer",
+  salesReportController.getCustomerDetails,
+);
 salesReportRouter.get(
   "/api/v1/reports/sales/trend",
   salesReportController.getTrend,

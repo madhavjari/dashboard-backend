@@ -43,6 +43,8 @@ model sales_items {
   meters         Decimal?      @default(0) @db.Decimal(18, 3)
   quantity       Decimal?      @default(0) @db.Decimal(18, 3)
   weight         Decimal?      @default(0) @db.Decimal(18, 3)
+  per            String?       @db.VarChar(100)
+  discount       Decimal?      @db.Decimal(18, 2)
   rate           Decimal?      @default(0) @db.Decimal(18, 2)
   amount         Decimal?      @default(0) @db.Decimal(18, 2)
   taxable        Decimal?      @default(0) @db.Decimal(18, 2)

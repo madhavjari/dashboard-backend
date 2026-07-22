@@ -1,11 +1,16 @@
 const { neonprisma } = require("../lib/neon");
 
-async function getItemWiseSummary(compNo = 1) {
+const { Prisma } = require("../generated/neon/client.js");
+async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
   const summary = await neonprisma.sales_items.aggregate({
     where: {
       sales_entries: {
         comp_no: compNo,
         code: "S",
+        bill_date: {
+          gte: new Date(fromDate),
+          lt: new Date(toDate),
+        },
       },
     },
     _sum: {
@@ -20,6 +25,7 @@ async function getItemWiseSummary(compNo = 1) {
       id: true,
     },
   });
+
   const uniqueItems = await neonprisma.sales_items.groupBy({
     by: ["item_name"],
     where: {
@@ -29,8 +35,9 @@ async function getItemWiseSummary(compNo = 1) {
       },
     },
   });
+
   const topItems = await neonprisma.sales_items.groupBy({
-    by: "item_name",
+    by: ["item_name", "per"],
     where: {
       sales_entries: {
         comp_no: compNo,
@@ -52,6 +59,28 @@ async function getItemWiseSummary(compNo = 1) {
     take: 10,
   });
 
+  const returnItems = await neonprisma.sales_items.groupBy({
+    by: ["item_name", "per"],
+    where: {
+      sales_entries: {
+        comp_no: compNo,
+        code: "SR",
+      },
+    },
+    _sum: {
+      pcs: true,
+      meters: true,
+      weight: true,
+      amount: true,
+      final_amount: true,
+    },
+    orderBy: {
+      _sum: {
+        final_amount: "desc",
+      },
+    },
+  });
+
   return {
     summary: {
       totalPcs: summary._sum.pcs ?? 0,
@@ -66,6 +95,15 @@ async function getItemWiseSummary(compNo = 1) {
       pcs: item._sum.pcs ?? 0,
       meters: item._sum.meters ?? 0,
       weight: item._sum.weight ?? 0,
+      per: item.per,
+      revenue: item._sum.final_amount ?? 0,
+    })),
+    returnItems: returnItems.map((item) => ({
+      itemName: item.item_name,
+      pcs: item._sum.pcs ?? 0,
+      meters: item._sum.meters ?? 0,
+      weight: item._sum.weight ?? 0,
+      per: item.per,
       revenue: item._sum.final_amount ?? 0,
     })),
   };
@@ -138,7 +176,11 @@ async function getSalesKPI(fromDate, toDate) {
   return salesData;
 }
 
-async function getSalesByCustomer(fromDate, toDate) {
+async function getSalesByCustomer(
+  fromDate,
+  toDate,
+  searchFilter = Prisma.empty,
+) {
   const result = await neonprisma.$queryRaw`
   SELECT
     party,
@@ -180,7 +222,7 @@ async function getSalesByCustomer(fromDate, toDate) {
   WHERE code IN ('S', 'SR')
     AND bill_date >= ${fromDate}
     AND bill_date < ${toDate}
-
+    ${searchFilter}
   GROUP BY party
 
   ORDER BY net_sales DESC
@@ -194,6 +236,54 @@ async function getSalesByCustomer(fromDate, toDate) {
   }));
 }
 
+async function getCustomerPurchases(fromDate, toDate, party) {
+  const customerData = await neonprisma.sales_entries.findMany({
+    where: { party, code: { in: ["S", "SR"] } },
+    select: {
+      comp_no: true,
+      code: true,
+      bill_no: true,
+      bill_date: true,
+      party: true,
+      agent: true,
+      net_amount: true,
+      sales_items: {
+        select: {
+          item_name: true,
+          pcs: true,
+          meters: true,
+          weight: true,
+          per: true,
+          discount: true,
+          rate: true,
+          final_amount: true,
+        },
+      },
+    },
+    orderBy: { bill_date: "desc" },
+  });
+
+  return customerData.flatMap((row) =>
+    row.sales_items.map((item) => ({
+      compNo: row.comp_no,
+      code: row.code,
+      billNo: row.bill_no,
+      billDate: row.bill_date,
+      party: row.party,
+      agent: row.agent,
+      netAmount: row.net_amount,
+      itemName: item.item_name,
+      pcs: item.pcs,
+      meters: item.meters,
+      weight: item.weight,
+      per: item.per,
+      discount: item.discount,
+      rate: item.rate,
+      totalAmount: item.final_amount,
+    })),
+  );
+}
+
 async function getTrend(filters) {
   return { filters, data: [] };
 }
@@ -203,4 +293,5 @@ module.exports = {
   getSalesByCustomer,
   getTrend,
   getSalesKPI,
+  getCustomerPurchases,
 };
