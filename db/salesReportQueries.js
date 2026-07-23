@@ -56,7 +56,6 @@ async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
         final_amount: "desc",
       },
     },
-    take: 10,
   });
 
   const returnItems = await neonprisma.sales_items.groupBy({
@@ -87,7 +86,7 @@ async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
       totalMeters: summary._sum.meters ?? 0,
       totalWeight: summary._sum.weight ?? 0,
       totalTaxable: summary._sum.taxable ?? 0,
-      totalSales: summary._sum.final_amount ?? 0,
+      totalTransaction: summary._sum.final_amount ?? 0,
       totalUniqueItems: uniqueItems.length ?? 0,
     },
     topItems: topItems.map((item) => ({
@@ -96,7 +95,7 @@ async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
       meters: item._sum.meters ?? 0,
       weight: item._sum.weight ?? 0,
       per: item.per,
-      revenue: item._sum.final_amount ?? 0,
+      transaction: item._sum.final_amount ?? 0,
     })),
     returnItems: returnItems.map((item) => ({
       itemName: item.item_name,
@@ -104,7 +103,7 @@ async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
       meters: item._sum.meters ?? 0,
       weight: item._sum.weight ?? 0,
       per: item.per,
-      revenue: item._sum.final_amount ?? 0,
+      transaction: item._sum.final_amount ?? 0,
     })),
   };
 }
@@ -146,32 +145,32 @@ async function getSalesKPI(fromDate, toDate) {
       entry_id: true,
     },
   });
-  const grossSales = Number(sales._sum.net_amount ?? 0);
+  const grossAmount = Number(sales._sum.net_amount ?? 0);
 
   const returns = Number(salesReturns._sum.net_amount ?? 0);
 
-  const netSales = grossSales - returns;
+  const netAmount = grossAmount - returns;
 
   const invoiceCount = Number(sales._count.entry_id ?? 0);
   const returnCount = Number(salesReturns._count.entry_id ?? 0);
-  const cgstSales = Number(sales._sum.cgst ?? 0);
-  const sgstSales = Number(sales._sum.sgst ?? 0);
-  const igstSales = Number(sales._sum.igst ?? 0);
-  const cgstSalesReturn = Number(salesReturns._sum.cgst ?? 0);
-  const sgstSalesReturn = Number(salesReturns._sum.sgst ?? 0);
-  const igstSalesReturn = Number(salesReturns._sum.igst ?? 0);
+  const cgst = Number(sales._sum.cgst ?? 0);
+  const sgst = Number(sales._sum.sgst ?? 0);
+  const igst = Number(sales._sum.igst ?? 0);
+  const cgstReturn = Number(salesReturns._sum.cgst ?? 0);
+  const sgstReturn = Number(salesReturns._sum.sgst ?? 0);
+  const igstReturn = Number(salesReturns._sum.igst ?? 0);
   const salesData = {
-    grossSales,
+    grossAmount,
     returns,
-    netSales,
+    netAmount,
     invoiceCount,
     returnCount,
-    cgstSales,
-    igstSales,
-    sgstSales,
-    cgstSalesReturn,
-    sgstSalesReturn,
-    igstSalesReturn,
+    cgst,
+    igst,
+    sgst,
+    cgstReturn,
+    sgstReturn,
+    igstReturn,
   };
   return salesData;
 }
@@ -229,15 +228,15 @@ async function getSalesByCustomer(
 `;
   return result.map((row) => ({
     party: row.party,
-    salesAmount: Number(row.sales_amount),
+    grossAmount: Number(row.sales_amount),
     returnAmount: Number(row.return_amount),
-    netSales: Number(row.net_sales),
+    netAmount: Number(row.net_sales),
     invoiceCount: Number(row.invoice_count),
   }));
 }
 
 async function getCustomerPurchases(fromDate, toDate, party) {
-  const customerData = await neonprisma.sales_entries.findMany({
+  const partyData = await neonprisma.sales_entries.findMany({
     where: { party, code: { in: ["S", "SR"] } },
     select: {
       comp_no: true,
@@ -263,7 +262,7 @@ async function getCustomerPurchases(fromDate, toDate, party) {
     orderBy: { bill_date: "desc" },
   });
 
-  return customerData.flatMap((row) =>
+  return partyData.flatMap((row) =>
     row.sales_items.map((item) => ({
       compNo: row.comp_no,
       code: row.code,
@@ -284,14 +283,9 @@ async function getCustomerPurchases(fromDate, toDate, party) {
   );
 }
 
-async function getTrend(filters) {
-  return { filters, data: [] };
-}
-
 module.exports = {
   getItemWiseSummary,
   getSalesByCustomer,
-  getTrend,
   getSalesKPI,
   getCustomerPurchases,
 };

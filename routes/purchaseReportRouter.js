@@ -4,16 +4,20 @@ const purchaseReportController = require("../controllers/purchaseReportControlle
 const purchaseReportRouter = Router();
 
 purchaseReportRouter.get(
-  "/api/v1/reports/purchases/items",
-  purchaseReportController.getItems,
+  "/api/v1/reports/purchases/KPI-summary",
+  purchaseReportController.getKPISummary,
 );
 purchaseReportRouter.get(
   "/api/v1/reports/purchases/suppliers",
-  purchaseReportController.getSuppliers,
+  purchaseReportController.getSupplierWisePurchase,
 );
 purchaseReportRouter.get(
-  "/api/v1/reports/purchases/trend",
-  purchaseReportController.getTrend,
+  "/api/v1/reports/purchases/items",
+  purchaseReportController.getItemWisePurchases,
+);
+purchaseReportRouter.get(
+  "/api/v1/reports/purchases/supplier",
+  purchaseReportController.getPartyDetails,
 );
 
 module.exports = purchaseReportRouter;

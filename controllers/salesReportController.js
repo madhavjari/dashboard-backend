@@ -4,16 +4,15 @@ const {
   getItemWiseSummary,
   getCustomerPurchases,
 } = require("../db/salesReportQueries");
-const salesReportService = require("../services/salesReportService");
 
 const { Prisma } = require("../generated/neon/client.js");
 async function getItemWiseSales(req, res) {
   try {
-    const { summary, topItems, itemGroupSales } = await getItemWiseSummary(
+    const { summary, topItems, returnItems } = await getItemWiseSummary(
       "2025-04-01",
       "2026-03-31",
     );
-    return res.status(200).json({ summary, topItems, itemGroupSales });
+    return res.status(200).json({ summary, topItems, returnItems });
   } catch (error) {
     return res.status(500).json({ error });
   }
@@ -21,10 +20,10 @@ async function getItemWiseSales(req, res) {
 
 async function getKPISummary(req, res) {
   try {
-    const salesData = await getSalesKPI("2025-04-01", "2026-03-31");
+    const data = await getSalesKPI("2025-04-01", "2026-03-31");
 
     return res.status(200).json({
-      salesData,
+      data,
     });
   } catch {
     res.status(500).json({ message: "Internal Server error" });
@@ -33,9 +32,9 @@ async function getKPISummary(req, res) {
 
 async function getCustomerWiseSales(req, res) {
   try {
-    const salesData = await getSalesByCustomer("2025-04-01", "2026-03-31");
+    const data = await getSalesByCustomer("2025-04-01", "2026-03-31");
     return res.status(200).json({
-      salesData: salesData,
+      data,
     });
   } catch (err) {
     console.error(err);
@@ -48,19 +47,14 @@ async function getCustomerDetails(req, res) {
   const agent = party.toUpperCase();
   const filter = party ? Prisma.sql`AND party = ${agent} ` : Prisma.empty;
   try {
-    const customerData = await getCustomerPurchases(
-      "2025-04-01",
-      "2026-03-31",
-      agent,
-    );
+    const data = await getCustomerPurchases("2025-04-01", "2026-03-31", agent);
     const summary = await getSalesByCustomer(
       "2025-04-01",
       "2026-03-31",
       filter,
     );
-    console.log(summary);
     return res.status(200).json({
-      customerData,
+      data,
       summary,
     });
   } catch (err) {
@@ -69,18 +63,9 @@ async function getCustomerDetails(req, res) {
   }
 }
 
-async function getTrend(req, res, next) {
-  try {
-    return res.status(200).json(await salesReportService.getTrend(req.query));
-  } catch (error) {
-    return next(error);
-  }
-}
-
 module.exports = {
   getItemWiseSales,
   getKPISummary,
   getCustomerWiseSales,
-  getTrend,
   getCustomerDetails,
 };
