@@ -1,15 +1,15 @@
 const {
-  getPurchaseKPI,
-  getPurchasesBySupplier,
+  getKPI,
+  getPartyDetails,
   getItemWiseSummary,
-  getPartyPurchases,
-} = require("../db/purchaseReportQueries");
+  getIndividualPartyData,
+} = require("../db/spReportQueries.js");
 
 const { Prisma } = require("../generated/neon/client.js");
 
 async function getKPISummary(req, res) {
   try {
-    const data = await getPurchaseKPI("2025-04-01", "2026-03-31");
+    const data = await getKPI("2025-04-01", "2026-03-31", ["P", "OP"], ["PR"]);
 
     return res.status(200).json({
       data,
@@ -21,7 +21,13 @@ async function getKPISummary(req, res) {
 
 async function getSupplierWisePurchase(req, res) {
   try {
-    const data = await getPurchasesBySupplier("2025-04-01", "2026-03-31");
+    const data = await getPartyDetails(
+      "2025-04-01",
+      "2026-03-31",
+      ["P", "OP"],
+      ["PR"],
+      ["P", "OP", "PR"],
+    );
     return res.status(200).json({
       data,
     });
@@ -36,6 +42,8 @@ async function getItemWisePurchases(req, res) {
     const { summary, topItems, returnItems } = await getItemWiseSummary(
       "2025-04-01",
       "2026-03-31",
+      ["P", "OP"],
+      ["PR"],
     );
     return res.status(200).json({ summary, topItems, returnItems });
   } catch (error) {
@@ -43,15 +51,24 @@ async function getItemWisePurchases(req, res) {
   }
 }
 
-async function getPartyDetails(req, res) {
+async function getSupplierDetails(req, res) {
   const { party } = req.query;
-  const agent = party.toUpperCase();
-  const filter = party ? Prisma.sql`AND party = ${agent} ` : Prisma.empty;
+  const partyUpper = party.toUpperCase();
+  const filter = party ? Prisma.sql`AND party = ${partyUpper} ` : Prisma.empty;
   try {
-    const data = await getPartyPurchases("2025-04-01", "2026-03-31", agent);
-    const summary = await getPurchasesBySupplier(
+    const data = await getIndividualPartyData(
       "2025-04-01",
       "2026-03-31",
+      "party",
+      partyUpper,
+      ["P", "OP", "PR"],
+    );
+    const summary = await getPartyDetails(
+      "2025-04-01",
+      "2026-03-31",
+      ["P", "OP"],
+      ["PR"],
+      ["P", "OP", "PR"],
       filter,
     );
     return res.status(200).json({
@@ -64,9 +81,39 @@ async function getPartyDetails(req, res) {
   }
 }
 
+// async function getSalesItemDetails(req, res) {
+//   const { item } = req.query;
+//   const itemUpper = item.toUpperCase();
+//   const filter = item ? Prisma.sql`AND party = ${itemUpper} ` : Prisma.empty;
+//   try {
+//     const data = await getIndividualItemData(
+//       "2025-04-01",
+//       "2026-03-31",
+//       "itemName",
+//       itemUpper,
+//       ["P", "OP", "PR"],
+//     );
+//     const summary = await getItemDetails(
+//       "2025-04-01",
+//       "2026-03-31",
+//       ["P", "OP"],
+//       ["PR"],
+//       ["P", "OP", "PR"],
+//       filter,
+//     );
+//     return res.status(200).json({
+//       data,
+//       summary,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     return res.status(500).json({ message: "Internal Server error" });
+//   }
+// }
+
 module.exports = {
   getSupplierWisePurchase,
   getKPISummary,
   getItemWisePurchases,
-  getPartyDetails,
+  getSupplierDetails,
 };

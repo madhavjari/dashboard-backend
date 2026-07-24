@@ -1,12 +1,11 @@
-const { neonprisma } = require("../lib/neon");
+const { neonprisma } = require("../lib/neon.js");
 
 const { Prisma } = require("../generated/neon/client.js");
-async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
+async function getItemWiseSummary(fromDate, toDate, billCode, returnCode) {
   const summary = await neonprisma.sales_items.aggregate({
     where: {
       sales_entries: {
-        comp_no: compNo,
-        code: "S",
+        code: { in: billCode },
         bill_date: {
           gte: new Date(fromDate),
           lt: new Date(toDate),
@@ -30,8 +29,7 @@ async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
     by: ["item_name"],
     where: {
       sales_entries: {
-        code: "S",
-        comp_no: compNo,
+        code: { in: billCode },
       },
     },
   });
@@ -40,8 +38,7 @@ async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
     by: ["item_name", "per"],
     where: {
       sales_entries: {
-        comp_no: compNo,
-        code: "S",
+        code: { in: billCode },
       },
     },
     _sum: {
@@ -62,8 +59,7 @@ async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
     by: ["item_name", "per"],
     where: {
       sales_entries: {
-        comp_no: compNo,
-        code: "SR",
+        code: { in: returnCode },
       },
     },
     _sum: {
@@ -108,10 +104,10 @@ async function getItemWiseSummary(fromDate, toDate, compNo = 1) {
   };
 }
 
-async function getSalesKPI(fromDate, toDate) {
+async function getKPI(fromDate, toDate, billCode, returnCode) {
   const sales = await neonprisma.sales_entries.aggregate({
     where: {
-      code: "S",
+      code: { in: billCode },
       bill_date: {
         gte: new Date(fromDate),
         lt: new Date(toDate),
@@ -129,7 +125,7 @@ async function getSalesKPI(fromDate, toDate) {
   });
   const salesReturns = await neonprisma.sales_entries.aggregate({
     where: {
-      code: "SR",
+      code: { in: returnCode },
       bill_date: {
         gte: new Date(fromDate),
         lt: new Date(toDate),
@@ -159,7 +155,7 @@ async function getSalesKPI(fromDate, toDate) {
   const cgstReturn = Number(salesReturns._sum.cgst ?? 0);
   const sgstReturn = Number(salesReturns._sum.sgst ?? 0);
   const igstReturn = Number(salesReturns._sum.igst ?? 0);
-  const salesData = {
+  const data = {
     grossAmount,
     returns,
     netAmount,
@@ -172,53 +168,59 @@ async function getSalesKPI(fromDate, toDate) {
     sgstReturn,
     igstReturn,
   };
-  return salesData;
+  return data;
 }
 
-async function getSalesByCustomer(
+async function getPartyDetails(
   fromDate,
   toDate,
+  billCode,
+  returnCode,
+  mixCode,
   searchFilter = Prisma.empty,
 ) {
+  const billCodeSql = Prisma.join(billCode);
+  const returnCodeSql = Prisma.join(returnCode);
+  const mixCodeSql = Prisma.join(mixCode);
   const result = await neonprisma.$queryRaw`
   SELECT
     party,
 
     COALESCE(
       SUM(net_amount) FILTER (
-        WHERE code = 'S'
+        WHERE code in (${billCodeSql})
       ),
       0
     ) AS sales_amount,
 
     COALESCE(
       SUM(net_amount) FILTER (
-        WHERE code = 'SR'
+        WHERE code in (${returnCodeSql})
       ),
       0
     ) AS return_amount,
 
     COALESCE(
       SUM(net_amount) FILTER (
-        WHERE code = 'S'
+        WHERE code in (${billCodeSql})
       ),
       0
     )
     -
     COALESCE(
       SUM(net_amount) FILTER (
-        WHERE code = 'SR'
+        WHERE code in (${returnCodeSql})
       ),
       0
     ) AS net_sales,
 
     COUNT(*) FILTER (
-      WHERE code = 'S'
+      WHERE code in (${mixCodeSql})
     ) AS invoice_count
 
   FROM sales_entries
 
-  WHERE code IN ('S', 'SR')
+  WHERE code in (${mixCodeSql})
     AND bill_date >= ${fromDate}
     AND bill_date < ${toDate}
     ${searchFilter}
@@ -235,9 +237,16 @@ async function getSalesByCustomer(
   }));
 }
 
-async function getCustomerPurchases(fromDate, toDate, party) {
+async function getIndividualPartyData(fromDate, toDate, context, data, filter) {
   const partyData = await neonprisma.sales_entries.findMany({
-    where: { party, code: { in: ["S", "SR"] } },
+    where: {
+      [context]: data,
+      code: { in: filter },
+      bill_date: {
+        gte: new Date(fromDate),
+        lt: new Date(toDate),
+      },
+    },
     select: {
       comp_no: true,
       code: true,
@@ -285,7 +294,7 @@ async function getCustomerPurchases(fromDate, toDate, party) {
 
 module.exports = {
   getItemWiseSummary,
-  getSalesByCustomer,
-  getSalesKPI,
-  getCustomerPurchases,
+  getPartyDetails,
+  getKPI,
+  getIndividualPartyData,
 };

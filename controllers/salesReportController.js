@@ -1,9 +1,9 @@
 const {
-  getSalesKPI,
-  getSalesByCustomer,
+  getKPI,
+  getPartyDetails,
   getItemWiseSummary,
-  getCustomerPurchases,
-} = require("../db/salesReportQueries");
+  getIndividualPartyData,
+} = require("../db/spReportQueries.js");
 
 const { Prisma } = require("../generated/neon/client.js");
 async function getItemWiseSales(req, res) {
@@ -11,6 +11,8 @@ async function getItemWiseSales(req, res) {
     const { summary, topItems, returnItems } = await getItemWiseSummary(
       "2025-04-01",
       "2026-03-31",
+      ["S"],
+      ["SR"],
     );
     return res.status(200).json({ summary, topItems, returnItems });
   } catch (error) {
@@ -20,7 +22,7 @@ async function getItemWiseSales(req, res) {
 
 async function getKPISummary(req, res) {
   try {
-    const data = await getSalesKPI("2025-04-01", "2026-03-31");
+    const data = await getKPI("2025-04-01", "2026-03-31", ["S"], ["SR"]);
 
     return res.status(200).json({
       data,
@@ -32,7 +34,13 @@ async function getKPISummary(req, res) {
 
 async function getCustomerWiseSales(req, res) {
   try {
-    const data = await getSalesByCustomer("2025-04-01", "2026-03-31");
+    const data = await getPartyDetails(
+      "2025-04-01",
+      "2026-03-31",
+      ["S"],
+      ["SR"],
+      ["S", "SR"],
+    );
     return res.status(200).json({
       data,
     });
@@ -44,13 +52,23 @@ async function getCustomerWiseSales(req, res) {
 
 async function getCustomerDetails(req, res) {
   const { party } = req.query;
-  const agent = party.toUpperCase();
-  const filter = party ? Prisma.sql`AND party = ${agent} ` : Prisma.empty;
+  const partyUpper = party.toUpperCase();
+  const filter = party ? Prisma.sql`AND party = ${partyUpper} ` : Prisma.empty;
+
   try {
-    const data = await getCustomerPurchases("2025-04-01", "2026-03-31", agent);
-    const summary = await getSalesByCustomer(
+    const data = await getIndividualPartyData(
       "2025-04-01",
       "2026-03-31",
+      "party",
+      partyUpper,
+      ["S", "SR"],
+    );
+    const summary = await getPartyDetails(
+      "2025-04-01",
+      "2026-03-31",
+      ["S"],
+      ["SR"],
+      ["S", "SR"],
       filter,
     );
     return res.status(200).json({

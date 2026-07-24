@@ -17,7 +17,7 @@ purchaseReportRouter.get(
 );
 purchaseReportRouter.get(
   "/api/v1/reports/purchases/supplier",
-  purchaseReportController.getPartyDetails,
+  purchaseReportController.getSupplierDetails,
 );
 
 module.exports = purchaseReportRouter;
