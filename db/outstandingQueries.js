@@ -10,6 +10,13 @@ function toNumber(value) {
   return Number(value) || 0;
 }
 
+function createBillPartyKey(billNo, party) {
+  return JSON.stringify([
+    String(billNo || "").trim().toUpperCase(),
+    String(party || "").trim().toUpperCase(),
+  ]);
+}
+
 function getPaymentDays(billDate, payment) {
   const paymentDate = payment.clearing_date || payment.cheque_date;
   if (!paymentDate) return null;
@@ -85,7 +92,7 @@ async function getSales() {
     orderBy: { bill_date: "desc" },
   });
 
-  const salesByBillNumber = new Map();
+  const salesByBillAndParty = new Map();
   const returnsByParty = new Map();
   for (const entry of salesEntries) {
     if (entry.code === SALES_RETURN_CODE) {
@@ -98,16 +105,19 @@ async function getSales() {
 
     if (!entry.bill_no) continue;
 
-    const sale = salesByBillNumber.get(entry.bill_no);
+    const saleKey = createBillPartyKey(entry.bill_no, entry.party);
+    const sale = salesByBillAndParty.get(saleKey);
     if (sale) {
       sale.billAmount += toNumber(entry.net_amount);
       sale.amountToCollect = sale.billAmount - sale.adjustedAmount;
       continue;
     }
-    salesByBillNumber.set(entry.bill_no, createOutstandingSale(entry));
+    salesByBillAndParty.set(saleKey, createOutstandingSale(entry));
   }
 
-  const billNumbers = [...salesByBillNumber.keys()];
+  const billNumbers = [
+    ...new Set([...salesByBillAndParty.values()].map((sale) => sale.billNo)),
+  ];
   if (billNumbers.length > 0) {
     const allocations = await neonprisma.bill_payment_allocations.findMany({
       where: {
@@ -132,12 +142,17 @@ async function getSales() {
     });
 
     for (const allocation of allocations) {
-      const sale = salesByBillNumber.get(allocation.bill_no);
+      const sale = salesByBillAndParty.get(
+        createBillPartyKey(
+          allocation.bill_no,
+          allocation.payment_vouchers.party,
+        ),
+      );
       if (sale) addBankReceiptAllocation(sale, allocation);
     }
   }
 
-  const data = [...salesByBillNumber.values()];
+  const data = [...salesByBillAndParty.values()];
   const partySummaryByParty = new Map();
 
   for (const sale of data) {
@@ -223,16 +238,17 @@ async function getPurchases() {
     orderBy: { bill_date: "desc" },
   });
 
-  const purchasesByBillNumber = new Map();
+  const purchasesByBillAndParty = new Map();
   for (const entry of purchaseEntries) {
-    const purchase = purchasesByBillNumber.get(entry.bill_no);
+    const purchaseKey = createBillPartyKey(entry.bill_no, entry.party);
+    const purchase = purchasesByBillAndParty.get(purchaseKey);
     if (purchase) {
       purchase.billAmount += toNumber(entry.net_amount);
       purchase.amountToPay = purchase.billAmount - purchase.adjustedAmount;
       continue;
     }
 
-    purchasesByBillNumber.set(entry.bill_no, {
+    purchasesByBillAndParty.set(purchaseKey, {
       billNo: entry.bill_no,
       billDate: entry.bill_date,
       party: entry.party,
@@ -249,7 +265,11 @@ async function getPurchases() {
     });
   }
 
-  const billNumbers = [...purchasesByBillNumber.keys()];
+  const billNumbers = [
+    ...new Set(
+      [...purchasesByBillAndParty.values()].map((purchase) => purchase.billNo),
+    ),
+  ];
   if (billNumbers.length > 0) {
     const allocations = await neonprisma.bill_payment_allocations.findMany({
       where: {
@@ -274,7 +294,12 @@ async function getPurchases() {
     });
 
     for (const allocation of allocations) {
-      const purchase = purchasesByBillNumber.get(allocation.bill_no);
+      const purchase = purchasesByBillAndParty.get(
+        createBillPartyKey(
+          allocation.bill_no,
+          allocation.payment_vouchers.party,
+        ),
+      );
       if (!purchase) continue;
 
       const adjustedAmount = toNumber(allocation.adjust_amt);
@@ -301,7 +326,7 @@ async function getPurchases() {
     }
   }
 
-  const data = [...purchasesByBillNumber.values()];
+  const data = [...purchasesByBillAndParty.values()];
   const partySummaryByParty = new Map();
   const summary = data.reduce(
     (totals, purchase) => {

@@ -137,6 +137,39 @@ describe("outstandingQueries.getSales", () => {
       }),
     ]);
   });
+
+  test("does not apply a BR allocation when the voucher party differs", async () => {
+    neonprisma.sales_entries.findMany.mockResolvedValue([
+      {
+        code: "S",
+        bill_no: "S-100",
+        bill_date: new Date("2026-04-05"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+      },
+    ]);
+    neonprisma.bill_payment_allocations.findMany.mockResolvedValue([
+      {
+        bill_no: "S-100",
+        adjust_amt: "1000.00",
+        unadj_amt: "0.00",
+        bal_amt: "0.00",
+        payment_vouchers: {
+          mode: "CASH",
+          party: "ANOTHER COMPANY",
+          cheque_date: null,
+          clearing_date: null,
+          net_amount: "1000.00",
+        },
+      },
+    ]);
+
+    const report = await getSales();
+
+    expect(report.data[0]).toEqual(
+      expect.objectContaining({ adjustedAmount: 0, amountToCollect: 1000 }),
+    );
+  });
 });
 
 describe("outstandingQueries.getPurchases", () => {
