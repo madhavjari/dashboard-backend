@@ -4,6 +4,8 @@ const {
   loginSchema,
   emailSchema,
   passwordResetSchema,
+  partyDetailsSchema,
+  itemDetailsSchema,
 } = require("../../schema/validatorSchema");
 const { findUser } = require("../../db/authQueries");
 
@@ -440,5 +442,65 @@ describe("emailSchema", () => {
   test("does not perform a findUser check (schema is DB-agnostic)", async () => {
     await emailSchema.safeParseAsync({ body: { email: "john@example.com" } });
     expect(findUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("partyDetailsSchema", () => {
+  test("trims and uppercases party", async () => {
+    const result = await partyDetailsSchema.safeParseAsync({
+      query: { party: "  Acme Textiles  " },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data.query.party).toBe("ACME TEXTILES");
+  });
+
+  test.each([undefined, "", "   ", 123])(
+    "rejects an invalid party value: %p",
+    async (party) => {
+      const result = await partyDetailsSchema.safeParseAsync({
+        query: { party },
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
+
+  test("rejects a party longer than the database column", async () => {
+    const result = await partyDetailsSchema.safeParseAsync({
+      query: { party: "A".repeat(256) },
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("itemDetailsSchema", () => {
+  test("trims and uppercases item", async () => {
+    const result = await itemDetailsSchema.safeParseAsync({
+      query: { item: "  Cotton Fabric  " },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data.query.item).toBe("COTTON FABRIC");
+  });
+
+  test.each([undefined, "", "   ", 123])(
+    "rejects an invalid item value: %p",
+    async (item) => {
+      const result = await itemDetailsSchema.safeParseAsync({
+        query: { item },
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
+
+  test("rejects an item longer than the database column", async () => {
+    const result = await itemDetailsSchema.safeParseAsync({
+      query: { item: "A".repeat(256) },
+    });
+
+    expect(result.success).toBe(false);
   });
 });

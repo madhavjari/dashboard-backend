@@ -160,6 +160,7 @@ describe("POST /api/v1/auth/login", () => {
     const res = await request(app).post("/api/v1/auth/login").send(creds);
 
     expect(res.status).toBe(200);
+    expect(res.body.accessToken).toEqual(expect.any(String));
     expect(res.body.isVerified).toBe(true);
 
     const cookies = res.headers["set-cookie"];
@@ -387,6 +388,41 @@ describe("POST /api/v1/auth/reset-password", () => {
       reset,
       "new_hashed_pw",
     );
+  });
+});
+
+describe("POST /api/v1/auth/verify-password-reset-token", () => {
+  it("returns 400 when the token is missing", async () => {
+    const res = await request(app).post(
+      "/api/v1/auth/verify-password-reset-token",
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toHaveProperty("token");
+  });
+
+  it("returns 400 for an unknown token", async () => {
+    db.findPasswordResetToken.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post("/api/v1/auth/verify-password-reset-token")
+      .query({ token: "unknown-token" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/invalid token/i);
+  });
+
+  it("returns 200 for a valid token", async () => {
+    db.findPasswordResetToken.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    const res = await request(app)
+      .post("/api/v1/auth/verify-password-reset-token")
+      .query({ token: "valid-token" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/token is valid/i);
   });
 });
 

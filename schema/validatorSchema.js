@@ -115,10 +115,34 @@ const tokenSchema = z.object({
   }),
 });
 
+const partyDetailsSchema = z.object({
+  query: z.object({
+    party: z
+      .string({ error: "Party is required" })
+      .trim()
+      .min(1, "Party is required")
+      .max(255, "Party must be 255 characters or fewer")
+      .transform((party) => party.toUpperCase()),
+  }),
+});
+
+const itemDetailsSchema = z.object({
+  query: z.object({
+    item: z
+      .string({ error: "Item is required" })
+      .trim()
+      .min(1, "Item is required")
+      .max(255, "Item must be 255 characters or fewer")
+      .transform((item) => item.toUpperCase()),
+  }),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
   emailSchema,
   passwordResetSchema,
   tokenSchema,
+  partyDetailsSchema,
+  itemDetailsSchema,
 };

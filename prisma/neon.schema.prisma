@@ -52,3 +52,46 @@ model sales_items {
   created_at     DateTime?     @default(now()) @db.Timestamp(6)
   sales_entries  sales_entries @relation(fields: [sales_entry_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
+
+model bill_payment_allocations {
+  id               BigInt           @id @default(autoincrement())
+  payment_entry_id BigInt
+  code             String?          @db.VarChar(100)
+  bill_no          String?          @db.VarChar(100)
+  alloc_date       DateTime?        @db.Date
+  mode             String?          @db.VarChar(100)
+  bill_amt         Decimal?         @db.Decimal(18, 2)
+  adjust_amt       Decimal?         @db.Decimal(18, 2)
+  unadj_amt        Decimal?         @db.Decimal(18, 2)
+  bal_amt          Decimal?         @db.Decimal(18, 2)
+  status           String?          @db.VarChar(100)
+  created_at       DateTime?        @default(now()) @db.Timestamp(6)
+  payment_vouchers payment_vouchers @relation(fields: [payment_entry_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([bill_no], map: "idx_bpa_bill_lookup")
+}
+
+model payment_vouchers {
+  id                       BigInt                     @id @default(autoincrement())
+  entry_id                 String                     @db.VarChar(100)
+  comp_no                  String                     @db.VarChar(100)
+  voucher_date             DateTime?                  @db.Date
+  mode                     String?                    @db.VarChar(100)
+  vchr_type                String?                    @db.VarChar(100)
+  slip_no                  String?                    @db.VarChar(100)
+  ref_no                   String?                    @db.VarChar(100)
+  party                    String?                    @db.VarChar(255)
+  cheque_no                String?                    @db.VarChar(100)
+  cheque_date              DateTime?                  @db.Date
+  cheque_bank              String?                    @db.VarChar(255)
+  clearing_date            DateTime?                  @db.Date
+  net_amount               Decimal?                   @db.Decimal(18, 2)
+  remarks                  String?
+  modify_date              DateTime?                  @db.Date
+  modify_time              String?                    @db.VarChar(50)
+  created_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  updated_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  bill_payment_allocations bill_payment_allocations[]
+
+  @@unique([entry_id, comp_no])
+}

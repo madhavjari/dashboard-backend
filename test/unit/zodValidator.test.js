@@ -66,6 +66,22 @@ describe("validate middleware", () => {
     expect(next).toHaveBeenCalled();
   });
 
+  test("overwrites a getter-based req.query with transformed data", async () => {
+    const schema = z.object({
+      query: z.object({ party: z.string().trim().toUpperCase() }),
+    });
+    Object.defineProperty(req, "query", {
+      configurable: true,
+      get: () => ({ party: "  Acme Textiles  " }),
+    });
+
+    const middleware = validate(schema);
+    await middleware(req, res, next);
+
+    expect(req.query.party).toBe("ACME TEXTILES");
+    expect(next).toHaveBeenCalled();
+  });
+
   test("returns fieldErrors grouped by field name", async () => {
     const schema = z.object({
       body: z.object({

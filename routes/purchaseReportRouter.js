@@ -1,5 +1,11 @@
 const { Router } = require("express");
 const purchaseReportController = require("../controllers/purchaseReportController");
+const itemReportController = require("../controllers/itemReportController");
+const { validate } = require("../middleware/zodValidator");
+const {
+  partyDetailsSchema,
+  itemDetailsSchema,
+} = require("../schema/validatorSchema");
 
 const purchaseReportRouter = Router();
 
@@ -17,7 +23,13 @@ purchaseReportRouter.get(
 );
 purchaseReportRouter.get(
   "/api/v1/reports/purchases/supplier",
+  validate(partyDetailsSchema),
   purchaseReportController.getSupplierDetails,
+);
+purchaseReportRouter.get(
+  "/api/v1/reports/purchases/item",
+  validate(itemDetailsSchema),
+  itemReportController.getPurchaseItemDetails,
 );
 
 module.exports = purchaseReportRouter;
