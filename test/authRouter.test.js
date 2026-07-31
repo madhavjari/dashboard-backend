@@ -167,7 +167,7 @@ describe("POST /api/v1/auth/login", () => {
     expect(cookies).toBeDefined();
     expect(cookies[0]).toMatch(/refresh_token=/);
     expect(cookies[0]).toMatch(/HttpOnly/);
-    expect(cookies[0]).toMatch(/Path=\/api\/auth/);
+    expect(cookies[0]).toMatch(/Path=\/api\/v1\/auth/);
   });
 
   it("returns 401 with a generic message when the user doesn't exist", async () => {
@@ -452,6 +452,22 @@ describe("POST /api/v1/auth/refresh", () => {
     expect(res.status).toBe(401);
   });
 
+  it("returns 401 for a revoked refresh token", async () => {
+    db.findRefreshToken.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 60_000),
+      revoked: true,
+      used: false,
+    });
+
+    const res = await request(app)
+      .post("/api/v1/auth/refresh")
+      .set("Cookie", "refresh_token=revoked");
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatch(/invalid refresh token/i);
+    expect(db.rotateRefreshToken).not.toHaveBeenCalled();
+  });
+
   it("detects reuse of an already-used refresh token and revokes the family", async () => {
     db.findRefreshToken.mockResolvedValue({
       id: "rt_1",
@@ -497,6 +513,8 @@ describe("POST /api/v1/auth/refresh", () => {
         id: "rt_1",
         userId: "user_1",
         family: "family_1",
+        newHash: expect.any(String),
+        expiresAt: expect.any(Date),
       }),
     );
   });

@@ -14,6 +14,10 @@ purchaseReportRouter.get(
   purchaseReportController.getKPISummary,
 );
 purchaseReportRouter.get(
+  "/api/v1/reports/purchases/monthly",
+  purchaseReportController.getMonthlyReport,
+);
+purchaseReportRouter.get(
   "/api/v1/reports/purchases/suppliers",
   purchaseReportController.getSupplierWisePurchase,
 );

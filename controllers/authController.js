@@ -274,7 +274,10 @@ async function postRefreshToken(req, res) {
       await updateTokenStatus({ family: stored.family, revoked: true });
       return res.status(401).json({ error: "Refresh token reuse detected" });
     }
-    const { newRefreshToken, newRefreshTokenHash } = generatedRefreshToken();
+    const {
+      refreshToken: newRefreshToken,
+      refreshTokenHash: newRefreshTokenHash,
+    } = generatedRefreshToken();
 
     await rotateRefreshToken({
       id: stored.id,
@@ -287,7 +290,8 @@ async function postRefreshToken(req, res) {
     res
       .cookie("refresh_token", newRefreshToken, refreshCookieOptions)
       .json({ accessToken: newAccessToken });
-  } catch {
+  } catch (error) {
+    console.error("Refresh token request failed:", error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 }

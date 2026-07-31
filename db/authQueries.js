@@ -191,6 +191,7 @@ async function findRefreshToken({ tokenHash }) {
       tokenHash: true,
       family: true,
       used: true,
+      revoked: true,
     },
     where: {
       tokenHash: tokenHash,

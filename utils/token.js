@@ -37,7 +37,7 @@ const refreshCookieOptions = {
   httpOnly: true,
   secure: isProd,
   sameSite: isProd ? "none" : "lax",
-  path: "/api/auth",
+  path: "/api/v1/auth",
   maxAge: REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
 };
 

@@ -1,5 +1,6 @@
 const {
   getKPI,
+  getMonthlySales,
   getPartyDetails,
   getItemWiseSummary,
   getIndividualPartyData,
@@ -23,6 +24,21 @@ function createReportController(billCodes, returnCodes) {
     async getKPISummary(req, res) {
       try {
         const data = await getKPI(
+          REPORT_PERIOD.fromDate,
+          REPORT_PERIOD.toDate,
+          billCodes,
+          returnCodes,
+        );
+
+        return res.status(200).json({ data });
+      } catch (error) {
+        return sendInternalServerError(res, error);
+      }
+    },
+
+    async getMonthlyReport(req, res) {
+      try {
+        const data = await getMonthlySales(
           REPORT_PERIOD.fromDate,
           REPORT_PERIOD.toDate,
           billCodes,

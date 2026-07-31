@@ -4,6 +4,7 @@ const SALES_CODE = "S";
 const SALES_RETURN_CODE = "SR";
 const BANK_RECEIPT_CODE = "BR";
 const PURCHASE_CODES = ["P", "OP"];
+const PURCHASE_RETURN_CODE = "PR";
 const BANK_PAYMENT_CODE = "BP";
 
 function toNumber(value) {
@@ -226,10 +227,10 @@ async function getSales() {
 async function getPurchases() {
   const purchaseEntries = await neonprisma.sales_entries.findMany({
     where: {
-      code: { in: PURCHASE_CODES },
-      bill_no: { not: null },
+      code: { in: [...PURCHASE_CODES, PURCHASE_RETURN_CODE] },
     },
     select: {
+      code: true,
       bill_no: true,
       bill_date: true,
       party: true,
@@ -239,7 +240,18 @@ async function getPurchases() {
   });
 
   const purchasesByBillAndParty = new Map();
+  const returnsByParty = new Map();
   for (const entry of purchaseEntries) {
+    if (entry.code === PURCHASE_RETURN_CODE) {
+      returnsByParty.set(
+        entry.party,
+        (returnsByParty.get(entry.party) || 0) + toNumber(entry.net_amount),
+      );
+      continue;
+    }
+
+    if (!entry.bill_no) continue;
+
     const purchaseKey = createBillPartyKey(entry.bill_no, entry.party);
     const purchase = purchasesByBillAndParty.get(purchaseKey);
     if (purchase) {
@@ -342,6 +354,7 @@ async function getPurchases() {
         party: purchase.party,
         totalPurchaseAmount: 0,
         totalAdjustedAmount: 0,
+        totalPurchaseReturnAmount: 0,
         amountToPay: 0,
       };
       partySummary.totalPurchaseAmount += purchase.billAmount;
@@ -354,12 +367,35 @@ async function getPurchases() {
     {
       totalPurchaseAmount: 0,
       totalAdjustedAmount: 0,
+      totalPurchaseReturnAmount: 0,
       totalToPay: 0,
       totalOverpaidAmount: 0,
       invoiceCount: 0,
       paidInvoiceCount: 0,
       outstandingInvoiceCount: 0,
     },
+  );
+
+  for (const [party, returnAmount] of returnsByParty) {
+    const partySummary = partySummaryByParty.get(party) || {
+      party,
+      totalPurchaseAmount: 0,
+      totalAdjustedAmount: 0,
+      totalPurchaseReturnAmount: 0,
+      amountToPay: 0,
+    };
+    partySummary.totalPurchaseReturnAmount += returnAmount;
+    partySummary.amountToPay = Math.max(0, partySummary.amountToPay - returnAmount);
+    partySummaryByParty.set(party, partySummary);
+  }
+
+  summary.totalPurchaseReturnAmount = [...returnsByParty.values()].reduce(
+    (total, amount) => total + amount,
+    0,
+  );
+  summary.totalToPay = [...partySummaryByParty.values()].reduce(
+    (total, party) => total + party.amountToPay,
+    0,
   );
 
   const partySummary = [...partySummaryByParty.values()].sort(

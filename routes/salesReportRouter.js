@@ -14,6 +14,10 @@ salesReportRouter.get(
   salesReportController.getKPISummary,
 );
 salesReportRouter.get(
+  "/api/v1/reports/sales/monthly",
+  salesReportController.getMonthlyReport,
+);
+salesReportRouter.get(
   "/api/v1/reports/sales/customers",
   salesReportController.getCustomerWiseSales,
 );

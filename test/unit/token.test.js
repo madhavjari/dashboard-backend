@@ -174,7 +174,7 @@ describe("token utils", () => {
         httpOnly: true,
         secure: false,
         sameSite: "lax",
-        path: "/api/auth",
+        path: "/api/v1/auth",
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
     });

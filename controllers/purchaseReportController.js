@@ -4,6 +4,7 @@ const purchaseReport = createReportController(["P", "OP"], ["PR"]);
 
 module.exports = {
   getKPISummary: purchaseReport.getKPISummary,
+  getMonthlyReport: purchaseReport.getMonthlyReport,
   getSupplierWisePurchase: purchaseReport.getPartyWiseReport,
   getItemWisePurchases: purchaseReport.getItemWiseReport,
   getSupplierDetails: purchaseReport.getPartyDetails,

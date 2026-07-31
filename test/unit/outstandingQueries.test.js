@@ -207,6 +207,7 @@ describe("outstandingQueries.getPurchases", () => {
     expect(report.summary).toEqual({
       totalPurchaseAmount: 1000,
       totalAdjustedAmount: 750,
+      totalPurchaseReturnAmount: 0,
       totalToPay: 250,
       totalOverpaidAmount: 0,
       invoiceCount: 1,
@@ -222,7 +223,7 @@ describe("outstandingQueries.getPurchases", () => {
     );
     expect(neonprisma.sales_entries.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ code: { in: ["P", "OP"] } }),
+        where: expect.objectContaining({ code: { in: ["P", "OP", "PR"] } }),
       }),
     );
     expect(neonprisma.bill_payment_allocations.findMany).toHaveBeenCalledWith(

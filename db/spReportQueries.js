@@ -141,6 +141,35 @@ async function getKPI(fromDate, toDate, billCode, returnCode) {
   return data;
 }
 
+async function getMonthlySales(fromDate, toDate, billCode, returnCode) {
+  const billCodeSql = Prisma.join(billCode);
+  const returnCodeSql = Prisma.join(returnCode);
+  const allCodesSql = Prisma.join([...billCode, ...returnCode]);
+  const result = await neonprisma.$queryRaw`
+    SELECT
+      DATE_TRUNC('month', bill_date) AS month,
+      COALESCE(SUM(net_amount) FILTER (WHERE code IN (${billCodeSql})), 0) AS gross_amount,
+      COALESCE(SUM(net_amount) FILTER (WHERE code IN (${returnCodeSql})), 0) AS return_amount
+    FROM sales_entries
+    WHERE code IN (${allCodesSql})
+      AND bill_date >= ${fromDate}
+      AND bill_date < ${toDate}
+    GROUP BY DATE_TRUNC('month', bill_date)
+    ORDER BY DATE_TRUNC('month', bill_date)
+  `;
+
+  return result.map((row) => {
+    const grossAmount = Number(row.gross_amount);
+    const returnAmount = Number(row.return_amount);
+    return {
+      month: row.month,
+      grossAmount,
+      returnAmount,
+      netAmount: grossAmount - returnAmount,
+    };
+  });
+}
+
 async function getPartyDetails(
   fromDate,
   toDate,
@@ -359,6 +388,7 @@ module.exports = {
   getItemWiseSummary,
   getPartyDetails,
   getKPI,
+  getMonthlySales,
   getIndividualPartyData,
   getIndividualItemDetails,
 };
