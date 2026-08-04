@@ -27,5 +27,5 @@ function createItemDetailsHandler(billCodes, returnCodes) {
 
 module.exports = {
   getSalesItemDetails: createItemDetailsHandler(["S"], ["SR"]),
-  getPurchaseItemDetails: createItemDetailsHandler(["P", "OP"], ["PR"]),
+  getPurchaseItemDetails: createItemDetailsHandler(["P", "OP", "FJ"], ["PR"]),
 };

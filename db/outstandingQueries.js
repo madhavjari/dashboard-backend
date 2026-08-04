@@ -3,7 +3,7 @@ const { neonprisma } = require("../lib/neon.js");
 const SALES_CODE = "S";
 const SALES_RETURN_CODE = "SR";
 const BANK_RECEIPT_CODE = "BR";
-const PURCHASE_CODES = ["P", "OP"];
+const PURCHASE_CODES = ["P", "OP", "FJ"];
 const PURCHASE_RETURN_CODE = "PR";
 const BANK_PAYMENT_CODE = "BP";
 
@@ -13,8 +13,12 @@ function toNumber(value) {
 
 function createBillPartyKey(billNo, party) {
   return JSON.stringify([
-    String(billNo || "").trim().toUpperCase(),
-    String(party || "").trim().toUpperCase(),
+    String(billNo || "")
+      .trim()
+      .toUpperCase(),
+    String(party || "")
+      .trim()
+      .toUpperCase(),
   ]);
 }
 
@@ -58,7 +62,8 @@ function createOutstandingSale(entry) {
 
 function addBankReceiptAllocation(sale, allocation) {
   const adjustedAmount = toNumber(allocation.adjust_amt);
-  const amountToCollect = sale.billAmount - (sale.adjustedAmount + adjustedAmount);
+  const amountToCollect =
+    sale.billAmount - (sale.adjustedAmount + adjustedAmount);
 
   sale.adjustedAmount += adjustedAmount;
   sale.unadjustedAmount += toNumber(allocation.unadj_amt);
@@ -315,9 +320,8 @@ async function getPurchases() {
       if (!purchase) continue;
 
       const adjustedAmount = toNumber(allocation.adjust_amt);
-      const amountToPay = purchase.billAmount - (
-        purchase.adjustedAmount + adjustedAmount
-      );
+      const amountToPay =
+        purchase.billAmount - (purchase.adjustedAmount + adjustedAmount);
 
       purchase.adjustedAmount += adjustedAmount;
       purchase.unadjustedAmount += toNumber(allocation.unadj_amt);
@@ -385,7 +389,10 @@ async function getPurchases() {
       amountToPay: 0,
     };
     partySummary.totalPurchaseReturnAmount += returnAmount;
-    partySummary.amountToPay = Math.max(0, partySummary.amountToPay - returnAmount);
+    partySummary.amountToPay = Math.max(
+      0,
+      partySummary.amountToPay - returnAmount,
+    );
     partySummaryByParty.set(party, partySummary);
   }
 

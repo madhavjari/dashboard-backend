@@ -1,6 +1,6 @@
 const { createReportController } = require("./reportControllerFactory.js");
 
-const purchaseReport = createReportController(["P", "OP"], ["PR"]);
+const purchaseReport = createReportController(["P", "OP", "FJ"], ["PR"]);
 
 module.exports = {
   getKPISummary: purchaseReport.getKPISummary,
