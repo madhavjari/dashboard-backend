@@ -1,6 +1,10 @@
 const { createReportController } = require("./reportControllerFactory.js");
+const { getPurchases } = require("../db/outstandingQueries.js");
 
-const purchaseReport = createReportController(["P", "OP", "FJ"], ["PR"]);
+const purchaseReport = createReportController(["P", "OP", "FJ"], ["PR"], {
+  getOutstandingReport: getPurchases,
+  outstandingField: "amountToPay",
+});
 
 module.exports = {
   getKPISummary: purchaseReport.getKPISummary,
