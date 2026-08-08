@@ -115,6 +115,23 @@ const tokenSchema = z.object({
   }),
 });
 
+const companyIdParamsSchema = z.object({
+  params: z.object({
+    companyId: z.uuid("Company ID must be a valid UUID"),
+  }),
+});
+
+const createSyncSourceSchema = companyIdParamsSchema.extend({
+  body: z.object({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Source name must be at least 2 characters")
+      .max(100, "Source name must be 100 characters or fewer")
+      .default("Primary accounting source"),
+  }),
+});
+
 const partyDetailsSchema = z.object({
   query: z.object({
     party: z
@@ -143,6 +160,8 @@ module.exports = {
   emailSchema,
   passwordResetSchema,
   tokenSchema,
+  companyIdParamsSchema,
+  createSyncSourceSchema,
   partyDetailsSchema,
   itemDetailsSchema,
 };

@@ -158,30 +158,6 @@ async function deletePasswordToken(userId) {
   });
 }
 
-async function findUserFromApi(apikey) {
-  const user = await prisma.apikey.findFirst({
-    select: {
-      user: {
-        id: true,
-      },
-    },
-    where: {
-      apikey: apikey,
-    },
-  });
-  return user;
-}
-
-async function generateApikey(apikey, userId) {
-  await prisma.apikey.create({
-    data: {
-      apikey,
-      userId,
-      createAt: Date.now(),
-    },
-  });
-}
-
 async function findRefreshToken({ tokenHash }) {
   const token = await prisma.refreshToken.findFirst({
     select: {
@@ -232,8 +208,6 @@ async function rotateRefreshToken({ id, userId, newHash, family, expiresAt }) {
 }
 
 module.exports = {
-  findUserFromApi,
-  generateApikey,
   createCompanyAndUser,
   findUser,
   findVerificationToken,

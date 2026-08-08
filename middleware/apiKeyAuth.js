@@ -1,18 +1,42 @@
-const { findUserFromApi } = require("../db/authQueries");
+const { authenticateSyncApiKey } = require("../db/syncSourceQueries");
 const { hashString } = require("../utils/token");
 
-async function apiKeyAuth(req, res, next) {
+function getPresentedApiKey(req) {
+  const authorization = req.get("authorization");
+  const bearerMatch = authorization?.match(/^Bearer\s+(.+)$/i);
+  if (bearerMatch) return bearerMatch[1].trim();
+
+  return req.get("x-api-key")?.trim() || null;
+}
+
+async function syncApiKeyAuth(req, res, next) {
   try {
-    const key = req.header("x-api-key");
-    if (!key) return res.status(401).json({ message: "No api key provided" });
-    const hashKey = hashString(key);
-    const user = await findUserFromApi(hashKey);
-    if (!user) return res.status(401).json({ message: "Invalid key" });
-    req.user = user;
-    next();
-  } catch {
+    const apiKey = getPresentedApiKey(req);
+    if (!apiKey) {
+      return res.status(401).json({
+        code: "SYNC_API_KEY_REQUIRED",
+        message: "Sync API key is required.",
+      });
+    }
+
+    const syncAuth = await authenticateSyncApiKey(hashString(apiKey));
+    if (!syncAuth) {
+      return res.status(401).json({
+        code: "INVALID_SYNC_API_KEY",
+        message: "Invalid or inactive sync API key.",
+      });
+    }
+
+    req.syncAuth = syncAuth;
+    return next();
+  } catch (error) {
+    console.error("Sync API key authentication failed:", error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
-module.exports = { apiKeyAuth };
+module.exports = {
+  syncApiKeyAuth,
+  // Keep the old export name temporarily for callers that have not migrated.
+  apiKeyAuth: syncApiKeyAuth,
+};

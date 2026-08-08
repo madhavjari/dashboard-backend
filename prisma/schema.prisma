@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -19,54 +14,48 @@ enum Role {
   VIEWER
 }
 
-
-model Company{
+model Company {
   id          String        @id @default(uuid())
-  name        String        
+  name        String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
   users       CompanyUser[]
+  syncSources SyncSource[]
 }
 
-model User{
-  id          String        @id @default(uuid())
-  firstName   String   
-  lastName    String
-  email       String        @unique
-  phoneNumber String
-  password    String
-  createdAt   DateTime      @default(now())
-  companies   CompanyUser[]
-  RefreshToken  RefreshToken[]
-  emailVerified Boolean     @default(false)
-  EmailVerificationTokens EmailVerificationToken[]
-  phoneVerified Boolean     @default(false)
-  PhoneVerificationTokens PhoneVerificationToken[]  
-  PasswordReset PasswordReset[]
-  apikey      Apikey?              
+model User {
+  id                      String                   @id @default(uuid())
+  firstName               String
+  lastName                String
+  email                   String                   @unique
+  phoneNumber             String
+  password                String
+  createdAt               DateTime                 @default(now())
+  companies               CompanyUser[]
+  refreshTokens           RefreshToken[]
+  emailVerified           Boolean                  @default(false)
+  emailVerificationTokens EmailVerificationToken[]
+  phoneVerified           Boolean                  @default(false)
+  phoneVerificationTokens PhoneVerificationToken[]
+  passwordResets          PasswordReset[]
+  apikey                  Apikey?
 }
 
 model EmailVerificationToken {
   id        String   @id @default(cuid())
-
   token     String   @unique
-
   expiresAt DateTime
-
   userId    String
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }
 
 model PhoneVerificationToken {
   id        String   @id @default(cuid())
-
   token     String   @unique
-
   expiresAt DateTime
-
   userId    String
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }
 
@@ -76,40 +65,208 @@ model PasswordReset {
   expiresAt DateTime
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   createdAt DateTime @default(now())
 }
 
-model CompanyUser{
-  id          String        @id @default(uuid())
-  Company     Company       @relation(fields: [companyId], references:[id], onDelete: Cascade)
-  companyId   String
-  user        User          @relation(fields: [userId], references:[id], onDelete: Cascade)
-  userId      String
-  role        Role        @default(VIEWER)
-  createdAt   DateTime        @default(now())
+model CompanyUser {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @default(VIEWER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@unique([companyId, userId])
+  @@index([userId])
 }
 
 model RefreshToken {
   id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash String   @unique
   expiresAt DateTime
   family    String   @db.Uuid
-  used      Boolean  @default(false) 
+  used      Boolean  @default(false)
   revoked   Boolean  @default(false)
   createdAt DateTime @default(now())
+
   @@index([userId])
 }
 
-model Apikey{
-  id          String        @id @default(uuid())
-  keyHash     String        @unique
-  User        User          @relation(fields: [userId], references:[id], onDelete: Cascade)
-  userId      String        @unique
-  createdAt   DateTime      @default(now())
-  expiresAt   DateTime      @default(dbgenerated("NOW() + interval '1 year'"))
+// This is the unfinished user-level API key model. SyncApiKey is the
+// company/source credential intended for the accounting sync application.
+model Apikey {
+  id        String   @id @default(uuid())
+  keyHash   String   @unique
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime @default(dbgenerated("NOW() + interval '1 year'"))
+}
+
+model SyncSource {
+  id              String           @id @default(uuid())
+  companyId       String
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+  lastSyncedAt    DateTime?
+  apiKeys         SyncApiKey[]
+  billEntries     BillEntry[]
+  paymentVouchers PaymentVoucher[]
+
+  // Enables tenant-safe composite foreign keys from synchronized records.
+  @@unique([companyId, id])
+  @@index([companyId])
+}
+
+model SyncApiKey {
+  id           String     @id @default(uuid())
+  companyId    String
+  syncSourceId String
+  syncSource   SyncSource @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
+  name         String?
+  keyPrefix    String     @unique @db.VarChar(32)
+  keyHash      String     @unique
+  createdAt    DateTime   @default(now())
+  expiresAt    DateTime   @default(dbgenerated("NOW() + interval '1 year'"))
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+
+  @@index([companyId, syncSourceId])
+}
+
+model BillEntry {
+  id               BigInt     @id @default(autoincrement())
+  companyId        String
+  syncSourceId     String
+  syncSource       SyncSource @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
+  entryId          String     @db.VarChar(100)
+  compNo           String     @db.VarChar(100)
+  code             String?    @db.VarChar(50)
+  book             String?    @db.VarChar(100)
+  billNo           String?    @db.VarChar(100)
+  billDate         DateTime?  @db.Date
+  party            String?    @db.VarChar(255)
+  partyCode        String?    @db.VarChar(100)
+  agent            String?    @db.VarChar(255)
+  grossAmount      Decimal?   @db.Decimal(18, 2)
+  netAmount        Decimal?   @db.Decimal(18, 2)
+  cgst             Decimal?   @default(0) @db.Decimal(18, 2)
+  sgst             Decimal?   @default(0) @db.Decimal(18, 2)
+  igst             Decimal?   @default(0) @db.Decimal(18, 2)
+  sourceCreatedAt  DateTime?
+  sourceModifiedAt DateTime?
+  sourceModifyTime String?    @db.VarChar(50)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @default(now()) @updatedAt
+  items            BillItem[]
+
+  @@unique([companyId, id])
+  @@unique([companyId, syncSourceId, compNo, entryId])
+  @@index([companyId, billDate])
+  @@index([companyId, code, billDate])
+  @@index([companyId, party])
+}
+
+model BillItem {
+  id              BigInt    @id @default(autoincrement())
+  companyId       String
+  billEntryId     BigInt
+  billEntry       BillEntry @relation(fields: [companyId, billEntryId], references: [companyId, id], onDelete: Cascade)
+  entryId         String?   @db.VarChar(100)
+  serial          String?   @db.VarChar(50)
+  itemCode        String?   @db.VarChar(100)
+  itemName        String?   @db.VarChar(255)
+  category        String?   @db.VarChar(255)
+  itemGroup       String?   @db.VarChar(255)
+  brand           String?   @db.VarChar(255)
+  quality         String?   @db.VarChar(255)
+  design          String?   @db.VarChar(255)
+  colour          String?   @db.VarChar(255)
+  pattern         String?   @db.VarChar(255)
+  pcs             Decimal?  @default(0) @db.Decimal(18, 3)
+  meters          Decimal?  @default(0) @db.Decimal(18, 3)
+  quantity        Decimal?  @default(0) @db.Decimal(18, 3)
+  weight          Decimal?  @default(0) @db.Decimal(18, 3)
+  per             String?   @db.VarChar(100)
+  discountPercent Decimal?  @db.Decimal(9, 4)
+  discountAmount  Decimal?  @db.Decimal(18, 2)
+  rate            Decimal?  @default(0) @db.Decimal(18, 2)
+  amount          Decimal?  @default(0) @db.Decimal(18, 2)
+  taxableAmount   Decimal?  @default(0) @db.Decimal(18, 2)
+  finalAmount     Decimal?  @default(0) @db.Decimal(18, 2)
+  cgstRate        Decimal?  @db.Decimal(9, 4)
+  cgstAmount      Decimal?  @db.Decimal(18, 2)
+  sgstRate        Decimal?  @db.Decimal(9, 4)
+  sgstAmount      Decimal?  @db.Decimal(18, 2)
+  igstRate        Decimal?  @db.Decimal(9, 4)
+  igstAmount      Decimal?  @db.Decimal(18, 2)
+  cessRate        Decimal?  @db.Decimal(9, 4)
+  cessAmount      Decimal?  @db.Decimal(18, 2)
+  remarks         String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  @@unique([companyId, billEntryId, entryId])
+  @@index([companyId, billEntryId])
+  @@index([companyId, itemName])
+}
+
+model PaymentVoucher {
+  id               BigInt              @id @default(autoincrement())
+  companyId        String
+  syncSourceId     String
+  syncSource       SyncSource          @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
+  entryId          String              @db.VarChar(100)
+  compNo           String              @db.VarChar(100)
+  voucherDate      DateTime?           @db.Date
+  mode             String?             @db.VarChar(100)
+  voucherType      String?             @db.VarChar(100)
+  slipNo           String?             @db.VarChar(100)
+  referenceNo      String?             @db.VarChar(100)
+  party            String?             @db.VarChar(255)
+  chequeNo         String?             @db.VarChar(100)
+  chequeDate       DateTime?           @db.Date
+  chequeBank       String?             @db.VarChar(255)
+  clearingDate     DateTime?           @db.Date
+  netAmount        Decimal?            @db.Decimal(18, 2)
+  remarks          String?
+  sourceModifiedAt DateTime?
+  sourceModifyTime String?             @db.VarChar(50)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @default(now()) @updatedAt
+  allocations      PaymentAllocation[]
+
+  @@unique([companyId, id])
+  @@unique([companyId, syncSourceId, compNo, entryId])
+  @@index([companyId, voucherDate])
+  @@index([companyId, party])
+}
+
+model PaymentAllocation {
+  id               BigInt         @id @default(autoincrement())
+  companyId        String
+  paymentVoucherId BigInt
+  paymentVoucher   PaymentVoucher @relation(fields: [companyId, paymentVoucherId], references: [companyId, id], onDelete: Cascade)
+  entryId          String?        @db.VarChar(100)
+  code             String?        @db.VarChar(100)
+  billNo           String?        @db.VarChar(100)
+  allocationDate   DateTime?      @db.Date
+  mode             String?        @db.VarChar(100)
+  billAmount       Decimal?       @db.Decimal(18, 2)
+  adjustedAmount   Decimal?       @db.Decimal(18, 2)
+  unadjustedAmount Decimal?       @db.Decimal(18, 2)
+  balanceAmount    Decimal?       @db.Decimal(18, 2)
+  status           String?        @db.VarChar(100)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @default(now()) @updatedAt
+
+  @@unique([companyId, paymentVoucherId, entryId])
+  @@index([companyId, paymentVoucherId])
+  @@index([companyId, billNo])
 }

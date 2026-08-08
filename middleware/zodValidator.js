@@ -16,8 +16,6 @@ const validate = (schema) => async (req, res, next) => {
     return res.status(400).json({ status: "fail", errors });
   }
   req.body = result.data.body ?? req.body;
-  // In Express 5, req.query is a getter that reparses the URL on every access.
-  // Defining an own property preserves Zod transformations for downstream handlers.
   if (result.data.query !== undefined) {
     Object.defineProperty(req, "query", {
       value: result.data.query,

@@ -1,92 +1,109 @@
-const { hashString } = require("../../utils/token.js");
-const { apiKeyAuth } = require("../../middleware/apiKeyAuth.js");
-const { findUserFromApi } = require("../../db/authQueries.js");
+const { hashString } = require("../../utils/token");
+const { syncApiKeyAuth } = require("../../middleware/apiKeyAuth");
+const { authenticateSyncApiKey } = require("../../db/syncSourceQueries");
 
-jest.mock("../../utils/token.js", () => ({
+jest.mock("../../utils/token", () => ({
   hashString: jest.fn(),
 }));
 
-jest.mock("../../db/authQueries.js", () => ({
-  findUserFromApi: jest.fn(),
+jest.mock("../../db/syncSourceQueries", () => ({
+  authenticateSyncApiKey: jest.fn(),
 }));
 
-describe("apiKeyAuth middleware", () => {
+describe("syncApiKeyAuth middleware", () => {
+  let headers;
   let req;
   let res;
   let next;
 
   beforeEach(() => {
+    headers = {};
     req = {
-      header: jest.fn(),
+      get: jest.fn((name) => headers[name.toLowerCase()]),
     };
-
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
     };
-
     next = jest.fn();
-
     jest.clearAllMocks();
   });
 
-  it("should return 401 if no api key is provided", async () => {
-    req.header.mockReturnValue(undefined);
-
-    await apiKeyAuth(req, res, next);
+  it("returns 401 when no sync API key is provided", async () => {
+    await syncApiKeyAuth(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({
-      message: "No api key provided",
+      code: "SYNC_API_KEY_REQUIRED",
+      message: "Sync API key is required.",
     });
     expect(next).not.toHaveBeenCalled();
   });
 
-  it("should return 401 if api key is invalid", async () => {
-    req.header.mockReturnValue("my-api-key");
+  it("authenticates a Bearer sync API key", async () => {
+    headers.authorization = "Bearer sync_abc.secret";
     hashString.mockReturnValue("hashed-key");
-    findUserFromApi.mockResolvedValue(null);
-
-    await apiKeyAuth(req, res, next);
-
-    expect(hashString).toHaveBeenCalledWith("my-api-key");
-    expect(findUserFromApi).toHaveBeenCalledWith("hashed-key");
-
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      message: "Invalid key",
-    });
-    expect(next).not.toHaveBeenCalled();
-  });
-
-  it("should call next if api key is valid", async () => {
-    req.header.mockReturnValue("my-api-key");
-    hashString.mockReturnValue("hashed-key");
-    findUserFromApi.mockResolvedValue({
-      id: 1,
-      name: "John",
+    authenticateSyncApiKey.mockResolvedValue({
+      apiKeyId: "key_1",
+      companyId: "company_1",
+      syncSourceId: "source_1",
     });
 
-    await apiKeyAuth(req, res, next);
+    await syncApiKeyAuth(req, res, next);
 
-    expect(hashString).toHaveBeenCalledWith("my-api-key");
-    expect(findUserFromApi).toHaveBeenCalledWith("hashed-key");
-
+    expect(hashString).toHaveBeenCalledWith("sync_abc.secret");
+    expect(authenticateSyncApiKey).toHaveBeenCalledWith("hashed-key");
+    expect(req.syncAuth).toEqual({
+      apiKeyId: "key_1",
+      companyId: "company_1",
+      syncSourceId: "source_1",
+    });
     expect(next).toHaveBeenCalledTimes(1);
-    expect(res.status).not.toHaveBeenCalled();
   });
 
-  it("should return 500 if an error occurs", async () => {
-    req.header.mockImplementation(() => {
-      throw new Error("Unexpected error");
+  it("temporarily supports the x-api-key header", async () => {
+    headers["x-api-key"] = "sync_legacy.secret";
+    hashString.mockReturnValue("hashed-key");
+    authenticateSyncApiKey.mockResolvedValue({
+      apiKeyId: "key_1",
+      companyId: "company_1",
+      syncSourceId: "source_1",
     });
 
-    await apiKeyAuth(req, res, next);
+    await syncApiKeyAuth(req, res, next);
+
+    expect(hashString).toHaveBeenCalledWith("sync_legacy.secret");
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a generic 401 for an invalid, expired, or revoked key", async () => {
+    headers.authorization = "Bearer invalid-key";
+    hashString.mockReturnValue("invalid-hash");
+    authenticateSyncApiKey.mockResolvedValue(null);
+
+    await syncApiKeyAuth(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({
+      code: "INVALID_SYNC_API_KEY",
+      message: "Invalid or inactive sync API key.",
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when authentication fails unexpectedly", async () => {
+    headers.authorization = "Bearer sync_abc.secret";
+    hashString.mockReturnValue("hashed-key");
+    authenticateSyncApiKey.mockRejectedValue(new Error("database unavailable"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await syncApiKeyAuth(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({
       message: "Internal Server Error",
     });
     expect(next).not.toHaveBeenCalled();
+    console.error.mockRestore();
   });
 });

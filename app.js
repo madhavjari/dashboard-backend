@@ -9,6 +9,7 @@ const salesReportRouter = require("./routes/salesReportRouter");
 const purchaseReportRouter = require("./routes/purchaseReportRouter");
 const outstandingRouter = require("./routes/outstandingRouter");
 const cashflowRouter = require("./routes/cashflowRouter");
+const syncSourceRouter = require("./routes/syncSourceRouter");
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use(cookieParser());
 
 app.use(syncRouter);
 app.use(authRouter);
+app.use(syncSourceRouter);
 app.use(dashboardRouter);
 app.use(salesReportRouter);
 app.use(purchaseReportRouter);
