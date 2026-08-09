@@ -32,8 +32,8 @@ async function getItemWiseSummary(fromDate, toDate, billCode, returnCode) {
   );
 
   const [summary, uniqueItems, topItems, returnItems] = await Promise.all([
-    neonprisma.sales_items.aggregate({
-      where: { sales_entries: billEntryFilter },
+    neonprisma.bill_data.aggregate({
+      where: { bill_entries: billEntryFilter },
       _sum: {
         pcs: true,
         meters: true,
@@ -44,13 +44,13 @@ async function getItemWiseSummary(fromDate, toDate, billCode, returnCode) {
       },
       _count: { id: true },
     }),
-    neonprisma.sales_items.groupBy({
+    neonprisma.bill_data.groupBy({
       by: ["item_name"],
-      where: { sales_entries: billEntryFilter },
+      where: { bill_entries: billEntryFilter },
     }),
-    neonprisma.sales_items.groupBy({
+    neonprisma.bill_data.groupBy({
       by: ["item_name", "per"],
-      where: { sales_entries: billEntryFilter },
+      where: { bill_entries: billEntryFilter },
       _sum: {
         pcs: true,
         meters: true,
@@ -60,9 +60,9 @@ async function getItemWiseSummary(fromDate, toDate, billCode, returnCode) {
       },
       orderBy: { _sum: { final_amount: "desc" } },
     }),
-    neonprisma.sales_items.groupBy({
+    neonprisma.bill_data.groupBy({
       by: ["item_name", "per"],
-      where: { sales_entries: returnEntryFilter },
+      where: { bill_entries: returnEntryFilter },
       _sum: {
         pcs: true,
         meters: true,
@@ -90,7 +90,7 @@ async function getItemWiseSummary(fromDate, toDate, billCode, returnCode) {
 
 async function getKPI(fromDate, toDate, billCode, returnCode) {
   const [sales, salesReturns] = await Promise.all([
-    neonprisma.sales_entries.aggregate({
+    neonprisma.bill_entries.aggregate({
       where: createEntryDateFilter(billCode, fromDate, toDate),
       _sum: {
         net_amount: true,
@@ -100,7 +100,7 @@ async function getKPI(fromDate, toDate, billCode, returnCode) {
       },
       _count: { entry_id: true },
     }),
-    neonprisma.sales_entries.aggregate({
+    neonprisma.bill_entries.aggregate({
       where: createEntryDateFilter(returnCode, fromDate, toDate),
       _sum: {
         net_amount: true,
@@ -150,7 +150,7 @@ async function getMonthlySales(fromDate, toDate, billCode, returnCode) {
       DATE_TRUNC('month', bill_date) AS month,
       COALESCE(SUM(net_amount) FILTER (WHERE code IN (${billCodeSql})), 0) AS gross_amount,
       COALESCE(SUM(net_amount) FILTER (WHERE code IN (${returnCodeSql})), 0) AS return_amount
-    FROM sales_entries
+    FROM bill_entries
     WHERE code IN (${allCodesSql})
       AND bill_date >= ${fromDate}
       AND bill_date < ${toDate}
@@ -217,7 +217,7 @@ async function getPartyDetails(
       WHERE code in (${mixCodeSql})
     ) AS invoice_count
 
-  FROM sales_entries
+  FROM bill_entries
 
   WHERE code in (${mixCodeSql})
     AND bill_date >= ${fromDate}
@@ -237,7 +237,7 @@ async function getPartyDetails(
 }
 
 async function getIndividualPartyData(fromDate, toDate, context, data, filter) {
-  const partyData = await neonprisma.sales_entries.findMany({
+  const partyData = await neonprisma.bill_entries.findMany({
     where: {
       [context]: data,
       ...createEntryDateFilter(filter, fromDate, toDate),
@@ -250,7 +250,7 @@ async function getIndividualPartyData(fromDate, toDate, context, data, filter) {
       party: true,
       agent: true,
       net_amount: true,
-      sales_items: {
+      bill_data: {
         select: {
           item_name: true,
           pcs: true,
@@ -267,7 +267,7 @@ async function getIndividualPartyData(fromDate, toDate, context, data, filter) {
   });
 
   return partyData.flatMap((row) =>
-    row.sales_items.map((item) => ({
+    row.bill_data.map((item) => ({
       compNo: row.comp_no,
       code: row.code,
       billNo: row.bill_no,
@@ -288,10 +288,10 @@ async function getIndividualPartyData(fromDate, toDate, context, data, filter) {
 }
 
 async function getIndividualItemData(fromDate, toDate, itemName, filter) {
-  const itemData = await neonprisma.sales_entries.findMany({
+  const itemData = await neonprisma.bill_entries.findMany({
     where: {
       ...createEntryDateFilter(filter, fromDate, toDate),
-      sales_items: {
+      bill_data: {
         some: { item_name: itemName },
       },
     },
@@ -301,7 +301,7 @@ async function getIndividualItemData(fromDate, toDate, itemName, filter) {
       bill_no: true,
       bill_date: true,
       party: true,
-      sales_items: {
+      bill_data: {
         where: { item_name: itemName },
         select: {
           item_name: true,
@@ -317,7 +317,7 @@ async function getIndividualItemData(fromDate, toDate, itemName, filter) {
   });
 
   return itemData.flatMap((row) =>
-    row.sales_items.map((item) => ({
+    row.bill_data.map((item) => ({
       compNo: row.comp_no,
       code: row.code,
       billNo: row.bill_no,

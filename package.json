@@ -9,8 +9,9 @@
   "scripts": {
     "test": "jest",
     "lint": "eslint .",
+    "generate": "prisma generate --config prisma.config.js && prisma generate --config neon.prisma.config.js",
     "start": "node server.js",
-    "postinstall": "prisma generate",
+    "postinstall": "npm run generate",
     "dev": "node --watch server.js"
   },
   "dependencies": {

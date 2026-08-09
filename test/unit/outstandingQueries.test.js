@@ -1,6 +1,6 @@
 jest.mock("../../lib/neon.js", () => ({
   neonprisma: {
-    sales_entries: { findMany: jest.fn() },
+    bill_entries: { findMany: jest.fn() },
     bill_payment_allocations: { findMany: jest.fn() },
   },
 }));
@@ -14,7 +14,7 @@ describe("outstandingQueries.getSales", () => {
   });
 
   test("subtracts BR allocation adjustments from each sales bill", async () => {
-    neonprisma.sales_entries.findMany.mockResolvedValue([
+    neonprisma.bill_entries.findMany.mockResolvedValue([
       {
         bill_no: "S-100",
         bill_date: new Date("2026-04-05"),
@@ -87,7 +87,7 @@ describe("outstandingQueries.getSales", () => {
   });
 
   test("returns an empty report without querying allocations when there are no sales bills", async () => {
-    neonprisma.sales_entries.findMany.mockResolvedValue([]);
+    neonprisma.bill_entries.findMany.mockResolvedValue([]);
 
     await expect(getSales()).resolves.toEqual({
       summary: {
@@ -107,7 +107,7 @@ describe("outstandingQueries.getSales", () => {
   });
 
   test("subtracts sales returns from the affected party's amount to collect", async () => {
-    neonprisma.sales_entries.findMany.mockResolvedValue([
+    neonprisma.bill_entries.findMany.mockResolvedValue([
       {
         code: "S",
         bill_no: "S-100",
@@ -139,7 +139,7 @@ describe("outstandingQueries.getSales", () => {
   });
 
   test("does not apply a BR allocation when the voucher party differs", async () => {
-    neonprisma.sales_entries.findMany.mockResolvedValue([
+    neonprisma.bill_entries.findMany.mockResolvedValue([
       {
         code: "S",
         bill_no: "S-100",
@@ -178,7 +178,7 @@ describe("outstandingQueries.getPurchases", () => {
   });
 
   test("subtracts BP allocation adjustments from each purchase bill", async () => {
-    neonprisma.sales_entries.findMany.mockResolvedValue([
+    neonprisma.bill_entries.findMany.mockResolvedValue([
       {
         bill_no: "P-100",
         bill_date: new Date("2026-04-05"),
@@ -221,9 +221,9 @@ describe("outstandingQueries.getPurchases", () => {
         amountToPay: 250,
       }),
     );
-    expect(neonprisma.sales_entries.findMany).toHaveBeenCalledWith(
+    expect(neonprisma.bill_entries.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ code: { in: ["P", "OP", "PR"] } }),
+        where: expect.objectContaining({ code: { in: ["P", "OP", "FJ", "PR"] } }),
       }),
     );
     expect(neonprisma.bill_payment_allocations.findMany).toHaveBeenCalledWith(

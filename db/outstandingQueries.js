@@ -84,7 +84,7 @@ function addBankReceiptAllocation(sale, allocation) {
 }
 
 async function getSales() {
-  const salesEntries = await neonprisma.sales_entries.findMany({
+  const salesEntries = await neonprisma.bill_entries.findMany({
     where: {
       code: { in: [SALES_CODE, SALES_RETURN_CODE] },
     },
@@ -230,7 +230,7 @@ async function getSales() {
 }
 
 async function getPurchases() {
-  const purchaseEntries = await neonprisma.sales_entries.findMany({
+  const purchaseEntries = await neonprisma.bill_entries.findMany({
     where: {
       code: { in: [...PURCHASE_CODES, PURCHASE_RETURN_CODE] },
     },

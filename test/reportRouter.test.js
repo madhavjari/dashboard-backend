@@ -5,6 +5,9 @@ jest.mock("../controllers/salesReportController", () => ({
   getKPISummary: jest.fn((req, res) =>
     res.status(200).json({ handler: "sales-kpi", query: req.query }),
   ),
+  getMonthlyReport: jest.fn((req, res) =>
+    res.status(200).json({ handler: "sales-monthly", query: req.query }),
+  ),
   getCustomerWiseSales: jest.fn((req, res) =>
     res.status(200).json({ handler: "sales-customers", query: req.query }),
   ),
@@ -19,6 +22,9 @@ jest.mock("../controllers/salesReportController", () => ({
 jest.mock("../controllers/purchaseReportController", () => ({
   getKPISummary: jest.fn((req, res) =>
     res.status(200).json({ handler: "purchase-kpi", query: req.query }),
+  ),
+  getMonthlyReport: jest.fn((req, res) =>
+    res.status(200).json({ handler: "purchase-monthly", query: req.query }),
   ),
   getSupplierWisePurchase: jest.fn((req, res) =>
     res.status(200).json({ handler: "purchase-suppliers", query: req.query }),

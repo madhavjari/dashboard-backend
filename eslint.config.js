@@ -3,6 +3,10 @@ const globals = require("globals");
 const jest = require("eslint-plugin-jest");
 
 module.exports = [
+  {
+    ignores: ["generated/**", "node_modules/**"],
+  },
+
   js.configs.recommended,
 
   {
