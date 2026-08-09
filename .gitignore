@@ -13,3 +13,9 @@ dist
 
 
 /generated
+
+# Local CSV reference/export files
+/bill_payment_allocations.csv
+/payment_vouchers.csv
+/sales_entries.csv
+/sales_items.csv
