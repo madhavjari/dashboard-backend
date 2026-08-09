@@ -1,6 +1,8 @@
 const express = require("express");
 const request = require("supertest");
 
+jest.mock("../middleware/verifyToken", () => (req, res, next) => next());
+
 jest.mock("../services/outstandingService", () => ({
   getSales: jest.fn(),
   getPurchases: jest.fn(),

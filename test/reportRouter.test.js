@@ -1,6 +1,8 @@
 const express = require("express");
 const request = require("supertest");
 
+jest.mock("../middleware/verifyToken", () => (req, res, next) => next());
+
 jest.mock("../controllers/salesReportController", () => ({
   getKPISummary: jest.fn((req, res) =>
     res.status(200).json({ handler: "sales-kpi", query: req.query }),

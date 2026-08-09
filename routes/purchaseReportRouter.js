@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const purchaseReportController = require("../controllers/purchaseReportController");
 const itemReportController = require("../controllers/itemReportController");
+const { resolveReportAccess } = require("../middleware/reportAccess");
 const { validate } = require("../middleware/zodValidator");
 const {
   partyDetailsSchema,
@@ -8,6 +9,8 @@ const {
 } = require("../schema/validatorSchema");
 
 const purchaseReportRouter = Router();
+
+purchaseReportRouter.use("/api/v1/reports/purchases", resolveReportAccess);
 
 purchaseReportRouter.get(
   "/api/v1/reports/purchases/KPI-summary",
