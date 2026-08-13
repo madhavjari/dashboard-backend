@@ -6,9 +6,9 @@ jest.mock("../../lib/neon.js", () => ({
 }));
 
 const { neonprisma } = require("../../lib/neon.js");
-const { getSales, getPurchases } = require("../../db/outstandingQueries.js");
+const { getSales, getPurchases } = require("../../services/outstandingService.js");
 
-describe("outstandingQueries.getSales", () => {
+describe("outstandingService.getSales", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -172,7 +172,7 @@ describe("outstandingQueries.getSales", () => {
   });
 });
 
-describe("outstandingQueries.getPurchases", () => {
+describe("outstandingService.getPurchases", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

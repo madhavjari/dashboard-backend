@@ -1,4 +1,4 @@
-const { getIndividualItemDetails } = require("../db/spReportQueries.js");
+const { getIndividualItemDetails } = require("../services/reportService.js");
 
 const REPORT_PERIOD = {
   fromDate: "2025-04-01",

@@ -4,8 +4,7 @@ const {
   getPartyDetails,
   getItemWiseSummary,
   getIndividualPartyData,
-} = require("../db/spReportQueries.js");
-const { Prisma } = require("../generated/neon/client.js");
+} = require("../services/reportService.js");
 
 const REPORT_PERIOD = {
   fromDate: "2025-04-01",
@@ -118,7 +117,6 @@ function createReportController(
 
     async getPartyDetails(req, res) {
       const { party } = req.query;
-      const filter = Prisma.sql`AND party = ${party}`;
 
       try {
         const [data, summary] = await Promise.all([
@@ -135,7 +133,7 @@ function createReportController(
             billCodes,
             returnCodes,
             allCodes,
-            filter,
+            party,
           ),
         ]);
 

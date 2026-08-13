@@ -1,5 +1,5 @@
 const { createReportController } = require("./reportControllerFactory.js");
-const { getPurchases } = require("../db/outstandingQueries.js");
+const { getPurchases } = require("../services/outstandingService.js");
 
 const purchaseReport = createReportController(["P", "OP", "FJ"], ["PR"], {
   getOutstandingReport: getPurchases,

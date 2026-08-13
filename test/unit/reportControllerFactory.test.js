@@ -1,4 +1,4 @@
-jest.mock("../../db/spReportQueries.js", () => ({
+jest.mock("../../services/reportService.js", () => ({
   getKPI: jest.fn(),
   getMonthlySales: jest.fn(),
   getPartyDetails: jest.fn(),
@@ -6,7 +6,7 @@ jest.mock("../../db/spReportQueries.js", () => ({
   getIndividualPartyData: jest.fn(),
 }));
 
-const { getPartyDetails } = require("../../db/spReportQueries.js");
+const { getPartyDetails } = require("../../services/reportService.js");
 const {
   createReportController,
 } = require("../../controllers/reportControllerFactory.js");
