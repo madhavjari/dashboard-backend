@@ -1,6 +1,4 @@
-const {
-  upsertAccountingCompanies,
-} = require("../db/accountingCompanyQueries");
+const { upsertAccountingCompanies } = require("../db/accountingCompanyQueries");
 const {
   ingestBills,
   ingestPaymentVouchers,
@@ -81,17 +79,8 @@ async function postPaymentVouchers(req, res) {
   }
 }
 
-async function postBillData(req, res) {
-  const data = req.body;
-  return res.status(200).json({
-    success: true,
-    message: `Received ${data.length || 0} rows successfully!`,
-  });
-}
-
 module.exports = {
   postAccountingCompanies,
   postBills,
   postPaymentVouchers,
-  postBillData,
 };

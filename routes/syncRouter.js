@@ -31,10 +31,4 @@ syncRouter.post(
   syncController.postPaymentVouchers,
 );
 
-syncRouter.post(
-  "/api/v1/billdata",
-  syncApiKeyAuth,
-  syncController.postBillData,
-);
-
 module.exports = syncRouter;

@@ -10,9 +10,7 @@ jest.mock("../db/syncIngestionQueries", () => ({
   ingestPaymentVouchers: jest.fn(),
 }));
 
-const {
-  authenticateSyncApiKey,
-} = require("../db/syncSourceQueries");
+const { authenticateSyncApiKey } = require("../db/syncSourceQueries");
 const {
   ingestBills,
   ingestPaymentVouchers,
