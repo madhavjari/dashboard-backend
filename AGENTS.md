@@ -46,7 +46,7 @@ The request path normally follows:
 
 Key locations:
 
-- `server.js`: starts the HTTP server on hard-coded port `5000`.
+- `server.js`: starts on `PORT` from the environment, falling back to `5000`.
 - `app.js`: configures Express, JSON/form limits, cookies, CORS, and routers.
 - `routes/`: API paths and middleware wiring.
 - `controllers/`: HTTP status codes and response shapes.
@@ -115,13 +115,13 @@ Run `npm run generate` after changing the Prisma schema. See
 
 Subscription status belongs to the customer account and uses:
 
-| Status | Meaning |
-| --- | --- |
-| `PENDING` | Sync can be configured, but live account reports are not paid/approved |
-| `TRIAL` | The customer may view their own data until `trialEndsAt` |
-| `ACTIVE` | Paid access is active, optionally until `subscriptionEndsAt` |
-| `EXPIRED` | Trial or paid access has ended |
-| `SUSPENDED` | Access was stopped administratively |
+| Status      | Meaning                                                                |
+| ----------- | ---------------------------------------------------------------------- |
+| `PENDING`   | Sync can be configured, but live account reports are not paid/approved |
+| `TRIAL`     | The customer may view their own data until `trialEndsAt`               |
+| `ACTIVE`    | Paid access is active, optionally until `subscriptionEndsAt`           |
+| `EXPIRED`   | Trial or paid access has ended                                         |
+| `SUSPENDED` | Access was stopped administratively                                    |
 
 `db/accountQueries.js` derives frontend access information. An account needs
 both an active sync key and an active `TRIAL` or `ACTIVE` subscription to
@@ -136,14 +136,14 @@ automation and admin subscription controls are not implemented yet.
 
 Current report logic uses these transaction codes:
 
-| Meaning | Code(s) |
-| --- | --- |
-| Sale | `S` |
-| Sales return | `SR` |
-| Purchase | `P`, `OP`, `FJ` |
-| Purchase return | `PR` |
-| Bank receipt used against sales | `BR` |
-| Bank payment used against purchases | `BP` |
+| Meaning                             | Code(s)         |
+| ----------------------------------- | --------------- |
+| Sale                                | `S`             |
+| Sales return                        | `SR`            |
+| Purchase                            | `P`, `OP`, `FJ` |
+| Purchase return                     | `PR`            |
+| Bank receipt used against sales     | `BR`            |
+| Bank payment used against purchases | `BP`            |
 
 Reports use a hard-coded half-open period of `2025-04-01` through
 `2026-04-01` in `controllers/reportControllerFactory.js` and
@@ -158,7 +158,11 @@ to avoid applying payments to the wrong party's bill.
 
 ## API map
 
-All current routes are under `/api/v1`.
+Application routes are under `/api/v1`. Two deployment checks are available
+outside that prefix:
+
+- `GET /` — service metadata and API base path.
+- `GET /health` — lightweight liveness response.
 
 ### Authentication
 
@@ -240,7 +244,9 @@ local `.env`, which must not be committed):
 - `JWT_AUDIENCE`
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
-- `CLIENT_URL`
+- `CLIENT_URL` (primary frontend origin and email-link base URL)
+- `CORS_ORIGINS` (optional comma-separated additional frontend origins)
+- `PORT` (optional; defaults to `5000`)
 - `NODE_ENV` (`production` enables secure, `SameSite=None` refresh cookies)
 - `DEMO_COMPANY_ID` (optional current demo-report context)
 
@@ -255,9 +261,11 @@ npm test
 npm run lint
 ```
 
-The API listens on `http://localhost:5000`. CORS currently allows only
-`http://localhost:5173`, with credentials enabled. Request bodies are limited
-to 50 MB.
+The API listens on `http://localhost:5000` by default. CORS allows localhost
+development plus the normalized origins from `CLIENT_URL` and
+`CORS_ORIGINS`, with credentials enabled. Requests without a browser
+`Origin` header remain available to the accounting sync client. Request
+bodies are limited to 50 MB.
 
 Prisma migration work targets the primary schema through `prisma.config.js`.
 
