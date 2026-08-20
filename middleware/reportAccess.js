@@ -1,4 +1,5 @@
 const verifyToken = require("./verifyToken");
+const { DEMO_TENANT } = require("../config/demoTenant");
 
 function createAuthenticatedContext(user) {
   const memberships = Array.isArray(user.companies) ? user.companies : [];
@@ -19,7 +20,8 @@ function resolveReportAccess(req, res, next) {
   if (typeof authorization === "undefined") {
     req.reportContext = {
       mode: "demo",
-      companyId: process.env.DEMO_COMPANY_ID || null,
+      companyId:
+        process.env.DEMO_COMPANY_ID || DEMO_TENANT.companyId,
     };
     return next();
   }

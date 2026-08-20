@@ -52,7 +52,6 @@ model User {
   phoneVerified           Boolean                  @default(false)
   phoneVerificationTokens PhoneVerificationToken[]
   passwordResets          PasswordReset[]
-  apikey                  Apikey?
 }
 
 model EmailVerificationToken {
@@ -108,17 +107,6 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
-}
-
-// This is the unfinished user-level API key model. SyncApiKey is the
-// company/source credential intended for the accounting sync application.
-model Apikey {
-  id        String   @id @default(uuid())
-  keyHash   String   @unique
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  expiresAt DateTime @default(dbgenerated("NOW() + interval '1 year'"))
 }
 
 model SyncSource {

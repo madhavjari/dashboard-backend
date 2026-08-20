@@ -1,11 +1,9 @@
-jest.mock("../../lib/neon.js", () => ({
-  neonprisma: {
-    bill_entries: { findMany: jest.fn() },
-    bill_payment_allocations: { findMany: jest.fn() },
-  },
+jest.mock("../../db/outstandingQueries", () => ({
+  findBillEntries: jest.fn(),
+  findPaymentAllocations: jest.fn(),
 }));
 
-const { neonprisma } = require("../../lib/neon.js");
+const outstandingQueries = require("../../db/outstandingQueries");
 const { getSales, getPurchases } = require("../../services/outstandingService.js");
 
 describe("outstandingService.getSales", () => {
@@ -14,7 +12,7 @@ describe("outstandingService.getSales", () => {
   });
 
   test("subtracts BR allocation adjustments from each sales bill", async () => {
-    neonprisma.bill_entries.findMany.mockResolvedValue([
+    outstandingQueries.findBillEntries.mockResolvedValue([
       {
         bill_no: "S-100",
         bill_date: new Date("2026-04-05"),
@@ -28,7 +26,7 @@ describe("outstandingService.getSales", () => {
         net_amount: "500.00",
       },
     ]);
-    neonprisma.bill_payment_allocations.findMany.mockResolvedValue([
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
       {
         bill_no: "S-100",
         adjust_amt: "600.00",
@@ -76,18 +74,15 @@ describe("outstandingService.getSales", () => {
         ],
       }),
     );
-    expect(neonprisma.bill_payment_allocations.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          code: "BR",
-          bill_no: { in: ["S-100", "S-101"] },
-        }),
-      }),
+    expect(outstandingQueries.findPaymentAllocations).toHaveBeenCalledWith(
+      undefined,
+      "BR",
+      ["S-100", "S-101"],
     );
   });
 
   test("returns an empty report without querying allocations when there are no sales bills", async () => {
-    neonprisma.bill_entries.findMany.mockResolvedValue([]);
+    outstandingQueries.findBillEntries.mockResolvedValue([]);
 
     await expect(getSales()).resolves.toEqual({
       summary: {
@@ -103,11 +98,11 @@ describe("outstandingService.getSales", () => {
       data: [],
       partySummary: [],
     });
-    expect(neonprisma.bill_payment_allocations.findMany).not.toHaveBeenCalled();
+    expect(outstandingQueries.findPaymentAllocations).not.toHaveBeenCalled();
   });
 
   test("subtracts sales returns from the affected party's amount to collect", async () => {
-    neonprisma.bill_entries.findMany.mockResolvedValue([
+    outstandingQueries.findBillEntries.mockResolvedValue([
       {
         code: "S",
         bill_no: "S-100",
@@ -123,7 +118,7 @@ describe("outstandingService.getSales", () => {
         net_amount: "250.00",
       },
     ]);
-    neonprisma.bill_payment_allocations.findMany.mockResolvedValue([]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([]);
 
     const report = await getSales();
 
@@ -139,7 +134,7 @@ describe("outstandingService.getSales", () => {
   });
 
   test("does not apply a BR allocation when the voucher party differs", async () => {
-    neonprisma.bill_entries.findMany.mockResolvedValue([
+    outstandingQueries.findBillEntries.mockResolvedValue([
       {
         code: "S",
         bill_no: "S-100",
@@ -148,7 +143,7 @@ describe("outstandingService.getSales", () => {
         net_amount: "1000.00",
       },
     ]);
-    neonprisma.bill_payment_allocations.findMany.mockResolvedValue([
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
       {
         bill_no: "S-100",
         adjust_amt: "1000.00",
@@ -178,7 +173,7 @@ describe("outstandingService.getPurchases", () => {
   });
 
   test("subtracts BP allocation adjustments from each purchase bill", async () => {
-    neonprisma.bill_entries.findMany.mockResolvedValue([
+    outstandingQueries.findBillEntries.mockResolvedValue([
       {
         bill_no: "P-100",
         bill_date: new Date("2026-04-05"),
@@ -186,7 +181,7 @@ describe("outstandingService.getPurchases", () => {
         net_amount: "1000.00",
       },
     ]);
-    neonprisma.bill_payment_allocations.findMany.mockResolvedValue([
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
       {
         bill_no: "P-100",
         adjust_amt: "750.00",
@@ -221,14 +216,57 @@ describe("outstandingService.getPurchases", () => {
         amountToPay: 250,
       }),
     );
-    expect(neonprisma.bill_entries.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ code: { in: ["P", "OP", "FJ", "PR"] } }),
-      }),
+    expect(outstandingQueries.findBillEntries).toHaveBeenCalledWith(
+      undefined,
+      ["P", "OP", "FJ", "PR"],
     );
-    expect(neonprisma.bill_payment_allocations.findMany).toHaveBeenCalledWith(
+    expect(outstandingQueries.findPaymentAllocations).toHaveBeenCalledWith(
+      undefined,
+      "BP",
+      ["P-100"],
+    );
+  });
+});
+
+describe("outstanding accounting-company isolation", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("does not apply an allocation from another accounting company", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books_1",
+        code: "S",
+        bill_no: "S-100",
+        bill_date: new Date("2026-04-05"),
+        party: "SAME PARTY",
+        net_amount: "1000.00",
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
+      {
+        accounting_company_id: "books_2",
+        bill_no: "S-100",
+        adjust_amt: "1000.00",
+        unadj_amt: "0.00",
+        bal_amt: "0.00",
+        payment_vouchers: {
+          mode: "CASH",
+          party: "SAME PARTY",
+          cheque_date: null,
+          clearing_date: null,
+          net_amount: "1000.00",
+        },
+      },
+    ]);
+
+    const report = await getSales();
+
+    expect(report.data[0]).toEqual(
       expect.objectContaining({
-        where: expect.objectContaining({ code: "BP" }),
+        adjustedAmount: 0,
+        amountToCollect: 1000,
       }),
     );
   });

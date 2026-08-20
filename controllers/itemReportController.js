@@ -11,6 +11,7 @@ function createItemDetailsHandler(billCodes, returnCodes) {
 
     try {
       const report = await getIndividualItemDetails(
+        req.reportContext,
         REPORT_PERIOD.fromDate,
         REPORT_PERIOD.toDate,
         itemName,

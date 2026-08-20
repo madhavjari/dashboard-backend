@@ -1,117 +1,226 @@
-const { neonprisma } = require("../lib/neon.js");
-const { Prisma } = require("../generated/neon/client.js");
+const { prisma } = require("../lib/prisma.js");
+const { Prisma } = require("../generated/prisma/client.js");
+const {
+  createCompanyWhere,
+  createCompanySql,
+} = require("./reportScope");
 
-function createEntryDateFilter(codes, fromDate, toDate) {
+function createEntryDateFilter(reportContext, codes, fromDate, toDate) {
   return {
+    ...createCompanyWhere(reportContext),
     code: { in: codes },
-    bill_date: {
+    billDate: {
       gte: new Date(fromDate),
       lt: new Date(toDate),
     },
   };
 }
 
-async function findItemSummaryData(fromDate, toDate, billCodes, returnCodes) {
-  const billEntryFilter = createEntryDateFilter(billCodes, fromDate, toDate);
+function mapItemGroup(row) {
+  return {
+    item_name: row.itemName,
+    per: row.per,
+    _sum: {
+      pcs: row._sum.pcs,
+      meters: row._sum.meters,
+      weight: row._sum.weight,
+      amount: row._sum.amount,
+      final_amount: row._sum.finalAmount,
+    },
+  };
+}
+
+async function findItemSummaryData(
+  reportContext,
+  fromDate,
+  toDate,
+  billCodes,
+  returnCodes,
+) {
+  const companyWhere = createCompanyWhere(reportContext);
+  const billEntryFilter = createEntryDateFilter(
+    reportContext,
+    billCodes,
+    fromDate,
+    toDate,
+  );
   const returnEntryFilter = createEntryDateFilter(
+    reportContext,
     returnCodes,
     fromDate,
     toDate,
   );
 
   const [summary, uniqueItems, topItems, returnItems] = await Promise.all([
-    neonprisma.bill_data.aggregate({
-      where: { bill_entries: billEntryFilter },
+    prisma.billItem.aggregate({
+      where: {
+        ...companyWhere,
+        billEntry: billEntryFilter,
+      },
       _sum: {
         pcs: true,
         meters: true,
         weight: true,
         amount: true,
-        taxable: true,
-        final_amount: true,
+        taxableAmount: true,
+        finalAmount: true,
       },
       _count: { id: true },
     }),
-    neonprisma.bill_data.groupBy({
-      by: ["item_name"],
-      where: { bill_entries: billEntryFilter },
+    prisma.billItem.groupBy({
+      by: ["itemName"],
+      where: {
+        ...companyWhere,
+        billEntry: billEntryFilter,
+      },
     }),
-    neonprisma.bill_data.groupBy({
-      by: ["item_name", "per"],
-      where: { bill_entries: billEntryFilter },
+    prisma.billItem.groupBy({
+      by: ["itemName", "per"],
+      where: {
+        ...companyWhere,
+        billEntry: billEntryFilter,
+      },
       _sum: {
         pcs: true,
         meters: true,
         weight: true,
         amount: true,
-        final_amount: true,
+        finalAmount: true,
       },
-      orderBy: { _sum: { final_amount: "desc" } },
+      orderBy: { _sum: { finalAmount: "desc" } },
     }),
-    neonprisma.bill_data.groupBy({
-      by: ["item_name", "per"],
-      where: { bill_entries: returnEntryFilter },
+    prisma.billItem.groupBy({
+      by: ["itemName", "per"],
+      where: {
+        ...companyWhere,
+        billEntry: returnEntryFilter,
+      },
       _sum: {
         pcs: true,
         meters: true,
         weight: true,
         amount: true,
-        final_amount: true,
+        finalAmount: true,
       },
-      orderBy: { _sum: { final_amount: "desc" } },
+      orderBy: { _sum: { finalAmount: "desc" } },
     }),
   ]);
 
-  return { summary, uniqueItems, topItems, returnItems };
+  return {
+    summary: {
+      _sum: {
+        pcs: summary._sum.pcs,
+        meters: summary._sum.meters,
+        weight: summary._sum.weight,
+        amount: summary._sum.amount,
+        taxable: summary._sum.taxableAmount,
+        final_amount: summary._sum.finalAmount,
+      },
+      _count: summary._count,
+    },
+    uniqueItems: uniqueItems.map((row) => ({
+      item_name: row.itemName,
+    })),
+    topItems: topItems.map(mapItemGroup),
+    returnItems: returnItems.map(mapItemGroup),
+  };
 }
 
-async function findKpiData(fromDate, toDate, billCodes, returnCodes) {
+function mapBillAggregate(result) {
+  return {
+    _sum: {
+      net_amount: result._sum.netAmount,
+      cgst: result._sum.cgst,
+      sgst: result._sum.sgst,
+      igst: result._sum.igst,
+    },
+    _count: {
+      entry_id: result._count.entryId,
+    },
+  };
+}
+
+async function findKpiData(
+  reportContext,
+  fromDate,
+  toDate,
+  billCodes,
+  returnCodes,
+) {
   const [bills, returns] = await Promise.all([
-    neonprisma.bill_entries.aggregate({
-      where: createEntryDateFilter(billCodes, fromDate, toDate),
+    prisma.billEntry.aggregate({
+      where: createEntryDateFilter(
+        reportContext,
+        billCodes,
+        fromDate,
+        toDate,
+      ),
       _sum: {
-        net_amount: true,
+        netAmount: true,
         cgst: true,
         sgst: true,
         igst: true,
       },
-      _count: { entry_id: true },
+      _count: { entryId: true },
     }),
-    neonprisma.bill_entries.aggregate({
-      where: createEntryDateFilter(returnCodes, fromDate, toDate),
+    prisma.billEntry.aggregate({
+      where: createEntryDateFilter(
+        reportContext,
+        returnCodes,
+        fromDate,
+        toDate,
+      ),
       _sum: {
-        net_amount: true,
+        netAmount: true,
         cgst: true,
         sgst: true,
         igst: true,
       },
-      _count: { entry_id: true },
+      _count: { entryId: true },
     }),
   ]);
 
-  return { bills, returns };
+  return {
+    bills: mapBillAggregate(bills),
+    returns: mapBillAggregate(returns),
+  };
 }
 
-async function findMonthlyReportRows(fromDate, toDate, billCodes, returnCodes) {
+async function findMonthlyReportRows(
+  reportContext,
+  fromDate,
+  toDate,
+  billCodes,
+  returnCodes,
+) {
+  const companySql = createCompanySql(reportContext, Prisma);
   const billCodeSql = Prisma.join(billCodes);
   const returnCodeSql = Prisma.join(returnCodes);
   const allCodesSql = Prisma.join([...billCodes, ...returnCodes]);
 
-  return neonprisma.$queryRaw`
+  return prisma.$queryRaw`
     SELECT
-      DATE_TRUNC('month', bill_date) AS month,
-      COALESCE(SUM(net_amount) FILTER (WHERE code IN (${billCodeSql})), 0) AS gross_amount,
-      COALESCE(SUM(net_amount) FILTER (WHERE code IN (${returnCodeSql})), 0) AS return_amount
-    FROM bill_entries
-    WHERE code IN (${allCodesSql})
-      AND bill_date >= ${fromDate}
-      AND bill_date < ${toDate}
-    GROUP BY DATE_TRUNC('month', bill_date)
-    ORDER BY DATE_TRUNC('month', bill_date)
+      DATE_TRUNC('month', "billDate") AS month,
+      COALESCE(
+        SUM("netAmount") FILTER (WHERE code IN (${billCodeSql})),
+        0
+      ) AS gross_amount,
+      COALESCE(
+        SUM("netAmount") FILTER (WHERE code IN (${returnCodeSql})),
+        0
+      ) AS return_amount
+    FROM "BillEntry"
+    WHERE ${companySql}
+      AND code IN (${allCodesSql})
+      AND "billDate" >= ${fromDate}
+      AND "billDate" < ${toDate}
+    GROUP BY DATE_TRUNC('month', "billDate")
+    ORDER BY DATE_TRUNC('month', "billDate")
   `;
 }
 
 async function findPartySummaryRows(
+  reportContext,
   fromDate,
   toDate,
   billCodes,
@@ -119,111 +228,158 @@ async function findPartySummaryRows(
   allCodes,
   party,
 ) {
+  const companySql = createCompanySql(reportContext, Prisma);
   const billCodeSql = Prisma.join(billCodes);
   const returnCodeSql = Prisma.join(returnCodes);
   const allCodesSql = Prisma.join(allCodes);
-  const partyFilter = party ? Prisma.sql`AND party = ${party}` : Prisma.empty;
+  const partyFilter = party
+    ? Prisma.sql`AND party = ${party}`
+    : Prisma.empty;
 
-  return neonprisma.$queryRaw`
+  return prisma.$queryRaw`
     SELECT
       party,
       COALESCE(
-        SUM(net_amount) FILTER (
-          WHERE code in (${billCodeSql})
-        ),
+        SUM("netAmount") FILTER (WHERE code IN (${billCodeSql})),
         0
       ) AS sales_amount,
       COALESCE(
-        SUM(net_amount) FILTER (
-          WHERE code in (${returnCodeSql})
-        ),
+        SUM("netAmount") FILTER (WHERE code IN (${returnCodeSql})),
         0
       ) AS return_amount,
       COALESCE(
-        SUM(net_amount) FILTER (
-          WHERE code in (${billCodeSql})
-        ),
+        SUM("netAmount") FILTER (WHERE code IN (${billCodeSql})),
         0
       )
       -
       COALESCE(
-        SUM(net_amount) FILTER (
-          WHERE code in (${returnCodeSql})
-        ),
+        SUM("netAmount") FILTER (WHERE code IN (${returnCodeSql})),
         0
       ) AS net_sales,
-      COUNT(*) FILTER (
-        WHERE code in (${allCodesSql})
-      ) AS invoice_count
-    FROM bill_entries
-    WHERE code in (${allCodesSql})
-      AND bill_date >= ${fromDate}
-      AND bill_date < ${toDate}
+      COUNT(*) FILTER (WHERE code IN (${allCodesSql})) AS invoice_count
+    FROM "BillEntry"
+    WHERE ${companySql}
+      AND code IN (${allCodesSql})
+      AND "billDate" >= ${fromDate}
+      AND "billDate" < ${toDate}
       ${partyFilter}
     GROUP BY party
     ORDER BY net_sales DESC
   `;
 }
 
-async function findPartyTransactions(fromDate, toDate, field, value, codes) {
-  return neonprisma.bill_entries.findMany({
-    where: {
-      [field]: value,
-      ...createEntryDateFilter(codes, fromDate, toDate),
-    },
-    select: {
-      comp_no: true,
-      code: true,
-      bill_no: true,
-      bill_date: true,
-      party: true,
-      agent: true,
-      net_amount: true,
-      bill_data: {
-        select: {
-          item_name: true,
-          pcs: true,
-          meters: true,
-          weight: true,
-          per: true,
-          discount: true,
-          rate: true,
-          final_amount: true,
-        },
-      },
-    },
-    orderBy: { bill_date: "desc" },
-  });
+function mapBillItem(item) {
+  return {
+    item_name: item.itemName,
+    pcs: item.pcs,
+    meters: item.meters,
+    weight: item.weight,
+    per: item.per,
+    discount: item.discountAmount,
+    rate: item.rate,
+    final_amount: item.finalAmount,
+  };
 }
 
-async function findItemTransactions(fromDate, toDate, itemName, codes) {
-  return neonprisma.bill_entries.findMany({
+function mapBillTransaction(row) {
+  return {
+    accounting_company_id: row.accountingCompanyId,
+    comp_no: row.compNo,
+    code: row.code,
+    bill_no: row.billNo,
+    bill_date: row.billDate,
+    party: row.party,
+    agent: row.agent,
+    net_amount: row.netAmount,
+    bill_data: row.items.map(mapBillItem),
+  };
+}
+
+async function findPartyTransactions(
+  reportContext,
+  fromDate,
+  toDate,
+  field,
+  value,
+  codes,
+) {
+  const fieldMap = {
+    party: "party",
+    partyCode: "partyCode",
+  };
+  const modelField = fieldMap[field];
+  if (!modelField) throw new Error("Unsupported party lookup field");
+
+  const rows = await prisma.billEntry.findMany({
     where: {
-      ...createEntryDateFilter(codes, fromDate, toDate),
-      bill_data: {
-        some: { item_name: itemName },
-      },
+      ...createEntryDateFilter(reportContext, codes, fromDate, toDate),
+      [modelField]: value,
     },
     select: {
-      comp_no: true,
+      accountingCompanyId: true,
+      compNo: true,
       code: true,
-      bill_no: true,
-      bill_date: true,
+      billNo: true,
+      billDate: true,
       party: true,
-      bill_data: {
-        where: { item_name: itemName },
+      agent: true,
+      netAmount: true,
+      items: {
         select: {
-          item_name: true,
+          itemName: true,
           pcs: true,
           meters: true,
           weight: true,
           per: true,
-          final_amount: true,
+          discountAmount: true,
+          rate: true,
+          finalAmount: true,
         },
       },
     },
-    orderBy: { bill_date: "desc" },
+    orderBy: { billDate: "desc" },
   });
+
+  return rows.map(mapBillTransaction);
+}
+
+async function findItemTransactions(
+  reportContext,
+  fromDate,
+  toDate,
+  itemName,
+  codes,
+) {
+  const rows = await prisma.billEntry.findMany({
+    where: {
+      ...createEntryDateFilter(reportContext, codes, fromDate, toDate),
+      items: {
+        some: { itemName },
+      },
+    },
+    select: {
+      accountingCompanyId: true,
+      compNo: true,
+      code: true,
+      billNo: true,
+      billDate: true,
+      party: true,
+      items: {
+        where: { itemName },
+        select: {
+          itemName: true,
+          pcs: true,
+          meters: true,
+          weight: true,
+          per: true,
+          finalAmount: true,
+        },
+      },
+    },
+    orderBy: { billDate: "desc" },
+  });
+
+  return rows.map(mapBillTransaction);
 }
 
 module.exports = {

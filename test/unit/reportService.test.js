@@ -10,6 +10,11 @@ jest.mock("../../db/reportQueries.js", () => ({
 const reportQueries = require("../../db/reportQueries.js");
 const reportService = require("../../services/reportService.js");
 
+const reportContext = {
+  mode: "authenticated",
+  companyIds: ["company_1"],
+};
+
 describe("reportService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -94,6 +99,7 @@ describe("reportService", () => {
 
     await expect(
       reportService.getItemWiseSummary(
+        reportContext,
         "2025-04-01",
         "2026-04-01",
         ["S"],
@@ -143,6 +149,7 @@ describe("reportService", () => {
 
     await expect(
       reportService.getMonthlySales(
+        reportContext,
         "2025-04-01",
         "2026-04-01",
         ["S"],
@@ -170,6 +177,7 @@ describe("reportService", () => {
     ]);
 
     const result = await reportService.getPartyDetails(
+      reportContext,
       "2025-04-01",
       "2026-04-01",
       ["S"],
@@ -188,6 +196,7 @@ describe("reportService", () => {
       },
     ]);
     expect(reportQueries.findPartySummaryRows).toHaveBeenCalledWith(
+      reportContext,
       "2025-04-01",
       "2026-04-01",
       ["S"],
@@ -223,6 +232,7 @@ describe("reportService", () => {
     ]);
 
     const result = await reportService.getIndividualPartyData(
+      reportContext,
       "2025-04-01",
       "2026-04-01",
       "party",
@@ -281,6 +291,7 @@ describe("reportService", () => {
     ]);
 
     const result = await reportService.getIndividualItemDetails(
+      reportContext,
       "2025-04-01",
       "2026-04-01",
       "COTTON",
@@ -300,6 +311,7 @@ describe("reportService", () => {
       },
     ]);
     expect(reportQueries.findItemTransactions).toHaveBeenCalledWith(
+      reportContext,
       "2025-04-01",
       "2026-04-01",
       "COTTON",

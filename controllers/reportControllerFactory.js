@@ -46,6 +46,7 @@ function createReportController(
     async getKPISummary(req, res) {
       try {
         const data = await getKPI(
+          req.reportContext,
           REPORT_PERIOD.fromDate,
           REPORT_PERIOD.toDate,
           billCodes,
@@ -61,6 +62,7 @@ function createReportController(
     async getMonthlyReport(req, res) {
       try {
         const data = await getMonthlySales(
+          req.reportContext,
           REPORT_PERIOD.fromDate,
           REPORT_PERIOD.toDate,
           billCodes,
@@ -77,13 +79,14 @@ function createReportController(
       try {
         const [partyData, outstandingReport] = await Promise.all([
           getPartyDetails(
+            req.reportContext,
             REPORT_PERIOD.fromDate,
             REPORT_PERIOD.toDate,
             billCodes,
             returnCodes,
             allCodes,
           ),
-          getOutstandingReport(),
+          getOutstandingReport(req.reportContext),
         ]);
         const data = addOutstandingAmounts(
           partyData,
@@ -103,6 +106,7 @@ function createReportController(
     async getItemWiseReport(req, res) {
       try {
         const { summary, topItems, returnItems } = await getItemWiseSummary(
+          req.reportContext,
           REPORT_PERIOD.fromDate,
           REPORT_PERIOD.toDate,
           billCodes,
@@ -121,6 +125,7 @@ function createReportController(
       try {
         const [data, summary] = await Promise.all([
           getIndividualPartyData(
+            req.reportContext,
             REPORT_PERIOD.fromDate,
             REPORT_PERIOD.toDate,
             "party",
@@ -128,6 +133,7 @@ function createReportController(
             allCodes,
           ),
           getPartyDetails(
+            req.reportContext,
             REPORT_PERIOD.fromDate,
             REPORT_PERIOD.toDate,
             billCodes,

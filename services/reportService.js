@@ -85,6 +85,7 @@ function getIndividualItemSummary(transactions, returnCodes) {
 }
 
 async function getItemWiseSummary(
+  reportContext,
   fromDate,
   toDate,
   billCodes,
@@ -92,6 +93,7 @@ async function getItemWiseSummary(
 ) {
   const { summary, uniqueItems, topItems, returnItems } =
     await reportQueries.findItemSummaryData(
+      reportContext,
       fromDate,
       toDate,
       billCodes,
@@ -112,8 +114,9 @@ async function getItemWiseSummary(
   };
 }
 
-async function getKPI(fromDate, toDate, billCodes, returnCodes) {
+async function getKPI(reportContext, fromDate, toDate, billCodes, returnCodes) {
   const { bills, returns } = await reportQueries.findKpiData(
+    reportContext,
     fromDate,
     toDate,
     billCodes,
@@ -137,8 +140,15 @@ async function getKPI(fromDate, toDate, billCodes, returnCodes) {
   };
 }
 
-async function getMonthlySales(fromDate, toDate, billCodes, returnCodes) {
+async function getMonthlySales(
+  reportContext,
+  fromDate,
+  toDate,
+  billCodes,
+  returnCodes,
+) {
   const rows = await reportQueries.findMonthlyReportRows(
+    reportContext,
     fromDate,
     toDate,
     billCodes,
@@ -159,6 +169,7 @@ async function getMonthlySales(fromDate, toDate, billCodes, returnCodes) {
 }
 
 async function getPartyDetails(
+  reportContext,
   fromDate,
   toDate,
   billCodes,
@@ -167,6 +178,7 @@ async function getPartyDetails(
   party,
 ) {
   const rows = await reportQueries.findPartySummaryRows(
+    reportContext,
     fromDate,
     toDate,
     billCodes,
@@ -185,6 +197,7 @@ async function getPartyDetails(
 }
 
 async function getIndividualPartyData(
+  reportContext,
   fromDate,
   toDate,
   field,
@@ -192,6 +205,7 @@ async function getIndividualPartyData(
   codes,
 ) {
   const rows = await reportQueries.findPartyTransactions(
+    reportContext,
     fromDate,
     toDate,
     field,
@@ -203,6 +217,7 @@ async function getIndividualPartyData(
 }
 
 async function getIndividualItemDetails(
+  reportContext,
   fromDate,
   toDate,
   itemName,
@@ -210,6 +225,7 @@ async function getIndividualItemDetails(
   returnCodes,
 ) {
   const rows = await reportQueries.findItemTransactions(
+    reportContext,
     fromDate,
     toDate,
     itemName,

@@ -1,43 +1,76 @@
-const { neonprisma } = require("../lib/neon.js");
+const { prisma } = require("../lib/prisma.js");
+const { createCompanyWhere } = require("./reportScope");
 
-async function findBillEntries(codes) {
-  return neonprisma.bill_entries.findMany({
+async function findBillEntries(reportContext, codes) {
+  const rows = await prisma.billEntry.findMany({
     where: {
+      ...createCompanyWhere(reportContext),
       code: { in: codes },
     },
     select: {
+      accountingCompanyId: true,
       code: true,
-      bill_no: true,
-      bill_date: true,
+      billNo: true,
+      billDate: true,
       party: true,
-      net_amount: true,
+      netAmount: true,
     },
-    orderBy: { bill_date: "desc" },
+    orderBy: { billDate: "desc" },
   });
+
+  return rows.map((row) => ({
+    accounting_company_id: row.accountingCompanyId,
+    code: row.code,
+    bill_no: row.billNo,
+    bill_date: row.billDate,
+    party: row.party,
+    net_amount: row.netAmount,
+  }));
 }
 
-async function findPaymentAllocations(code, billNumbers) {
-  return neonprisma.bill_payment_allocations.findMany({
+async function findPaymentAllocations(
+  reportContext,
+  code,
+  billNumbers,
+) {
+  const rows = await prisma.paymentAllocation.findMany({
     where: {
+      ...createCompanyWhere(reportContext),
       code,
-      bill_no: { in: billNumbers },
+      billNo: { in: billNumbers },
     },
     select: {
-      bill_no: true,
-      adjust_amt: true,
-      unadj_amt: true,
-      bal_amt: true,
-      payment_vouchers: {
+      billNo: true,
+      adjustedAmount: true,
+      unadjustedAmount: true,
+      balanceAmount: true,
+      paymentVoucher: {
         select: {
+          accountingCompanyId: true,
           mode: true,
           party: true,
-          cheque_date: true,
-          clearing_date: true,
-          net_amount: true,
+          chequeDate: true,
+          clearingDate: true,
+          netAmount: true,
         },
       },
     },
   });
+
+  return rows.map((row) => ({
+    accounting_company_id: row.paymentVoucher.accountingCompanyId,
+    bill_no: row.billNo,
+    adjust_amt: row.adjustedAmount,
+    unadj_amt: row.unadjustedAmount,
+    bal_amt: row.balanceAmount,
+    payment_vouchers: {
+      mode: row.paymentVoucher.mode,
+      party: row.paymentVoucher.party,
+      cheque_date: row.paymentVoucher.chequeDate,
+      clearing_date: row.paymentVoucher.clearingDate,
+      net_amount: row.paymentVoucher.netAmount,
+    },
+  }));
 }
 
 module.exports = { findBillEntries, findPaymentAllocations };

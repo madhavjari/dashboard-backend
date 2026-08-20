@@ -34,9 +34,9 @@ The intended product flow is:
 7. The dashboard allows live account data during an active trial or paid
    subscription. A separate demo option uses sample data.
 
-That flow is not fully connected yet: report APIs read the legacy Neon schema,
-while the authenticated bill-data endpoint currently acknowledges its body
-without validating or writing accounting records.
+Sync ingestion and reports now use the tenant-aware Neon models. Remaining
+product gaps include subscription enforcement, dynamic report periods, and
+unfinished dashboard-summary and cashflow queries.
 
 ## Current architecture
 
@@ -56,21 +56,23 @@ Key locations:
 - `middleware/verifyToken.js`: JWT access-token authentication.
 - `middleware/apiKeyAuth.js`: sync API-key authentication.
 - `utils/token.js`: access/refresh/verification token generation and hashing.
-- `prisma/`: both database schemas and migrations for the primary schema.
+- `prisma/`: the primary database schema and migrations.
 - `test/` and `test/unit/`: Jest/Supertest route and unit tests.
-- `generated/`: generated Prisma clients; do not edit these files manually.
+- `generated/prisma/`: generated Prisma client; do not edit it manually.
 
 There is no global Express error handler in `app.js`. Controllers that call
 `next(error)` may fall through to Express's default error handling.
 
-## Two-database transition
+## Neon database consolidation
 
-Do not treat the two Prisma clients as interchangeable.
+Neon hosts the tenant-aware primary schema. Runtime and report code use these
+tenant-aware models.
 
-### Primary application database (`DATABASE_URL`)
+### Primary application database (Neon)
 
-Configured by `prisma.config.js`, modeled in `prisma/schema.prisma`, and exposed
-as `prisma` from `lib/prisma.js`. It stores:
+Configured by `prisma.config.js`, modeled in `prisma/schema.prisma`, and
+exposed as `prisma` from `lib/prisma.js`. The primary client prefers
+`NEON_DATABASE_URL` and falls back to `DATABASE_URL`. It stores:
 
 - users, customer accounts, memberships, and roles;
 - account-level subscription status and trial/subscription dates;
@@ -99,19 +101,15 @@ Tenant-aware records carry trusted account `companyId` and `syncSourceId`.
 that value from the authenticated source plus the supplied external company ID.
 Never trust internal IDs supplied by the sync request body.
 
-### Legacy report database (`NEON_DATABASE_URL`)
+### Removed legacy tables
 
-Configured by `neon.prisma.config.js`, modeled in
-`prisma/neon.schema.prisma`, and exposed as `neonprisma` from `lib/neon.js`.
-Current sales, purchase, outstanding, and item reports read its snake_case
-tables (`bill_entries`, `bill_data`, `payment_vouchers`, and
-`bill_payment_allocations`).
+The snake_case report tables and obsolete user-level `Apikey` table were
+removed after their rows were imported into the tenant-aware models. The
+dedicated demo `Company -> SyncSource -> AccountingCompany` preserves the
+sample records. New accounting line items are stored as `BillItem` rows.
 
-The report database has no company/tenant columns. Report endpoints therefore
-are not tenant-scoped in their current implementation.
-
-Run `npm run generate` after changing either Prisma schema. It generates both
-clients under `generated/prisma` and `generated/neon`.
+Run `npm run generate` after changing the Prisma schema. See
+`docs/neon-consolidation.md` for migration details and demo identifiers.
 
 ## Subscription and access states
 
@@ -225,20 +223,18 @@ never tenant identifiers supplied in the request body.
 - `GET /reports/cashflow` — placeholder returning an empty data array.
 
 Report and cashflow routers use `resolveReportAccess`. A missing authorization
-header currently creates a demo context, while a supplied token must be valid.
-However, controllers and legacy Neon queries do not yet use that context to
-select an account or accounting company, and they do not enforce subscription
-access. Treat this as an unfinished security/tenant-isolation area. Do not add
-paid access on top of the legacy shared data; first connect ingestion and
-reports to `AccountingCompany`.
+header creates a context for the isolated demo tenant, while a supplied token
+must be valid. Controllers pass that trusted context through services to
+primary Prisma queries, which scope reads to the demo company or the user's
+account memberships. Subscription access is not enforced yet.
 
 ## Environment and local commands
 
 Required runtime configuration is loaded from the environment (normally a
 local `.env`, which must not be committed):
 
-- `DATABASE_URL`
-- `NEON_DATABASE_URL`
+- `NEON_DATABASE_URL` (current primary Neon database)
+- `DATABASE_URL` (fallback runtime database URL)
 - `JWT_SECRET_KEY`
 - `JWT_ISSUER`
 - `JWT_AUDIENCE`
@@ -263,9 +259,7 @@ The API listens on `http://localhost:5000`. CORS currently allows only
 `http://localhost:5173`, with credentials enabled. Request bodies are limited
 to 50 MB.
 
-Prisma migration work should target the primary schema explicitly through
-`prisma.config.js`. The legacy Neon config has no migration directory and is
-currently a read/report model.
+Prisma migration work targets the primary schema through `prisma.config.js`.
 
 ## Working conventions
 
@@ -293,10 +287,9 @@ currently a read/report model.
 
 ## Known incomplete or surprising behavior
 
-- `POST /api/v1/billdata` authenticates a sync key and acknowledges the payload,
-  but it does not validate or persist accounting records.
-- `POST /api/v1/sync/companies` stores discovered company metadata, but bill
-  and payment ingestion is not yet connected to `AccountingCompany`.
+- The obsolete `POST /api/v1/billdata` route has been removed.
+- `POST /api/v1/sync/companies`, `/sync/bills`, and `/sync/vouchers` are
+  connected to tenant-aware `AccountingCompany` records in Neon.
 - `accountingCompanyId` remains nullable on `BillEntry` and
   `PaymentVoucher` so existing rows can be migrated; new ingestion should
   always populate it.
@@ -304,13 +297,13 @@ currently a read/report model.
   does not yet enforce it.
 - Trial activation and expiration persistence and platform-admin subscription
   controls are not implemented.
-- Reports read the legacy Neon database rather than the new tenant-aware models.
-- Report queries are not account- or accounting-company-scoped.
+- Reports read the primary tenant-aware Neon models and are account-scoped.
+  They currently aggregate all authorized accounting companies for an account;
+  explicit accounting-company selection is not implemented yet.
+- Legacy snake_case report tables and the old user-level `Apikey` table have
+  been removed; use `SyncApiKey` for accounting sync authentication.
 - Report dates are hard-coded to the 2025-26 financial year.
 - Dashboard summary and cashflow database queries are placeholders.
 - `GET /dashboard/summary` returns user data instead of a financial summary.
-- `routes/apikeyRouter.js` is unfinished, logs a randomly generated key when
-  imported, and is not mounted by `app.js`; use `SyncApiKey`, not the old
-  user-level `Apikey`, for accounting sync work.
 - `README.md` currently contains a raw accounting SQL query rather than project
   setup documentation; this file is the reliable repository overview for now.

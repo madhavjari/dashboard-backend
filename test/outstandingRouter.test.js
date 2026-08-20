@@ -10,6 +10,7 @@ jest.mock("../services/outstandingService", () => ({
 
 const outstandingService = require("../services/outstandingService");
 const outstandingRouter = require("../routes/outstandingRouter");
+const { DEMO_TENANT } = require("../config/demoTenant");
 
 const app = express();
 app.use(outstandingRouter);
@@ -32,9 +33,10 @@ describe("GET /api/v1/reports/outstanding/sales", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual(report);
-    expect(outstandingService.getSales).toHaveBeenCalledWith({
-      party: "ACME TEXTILES",
-    });
+    expect(outstandingService.getSales).toHaveBeenCalledWith(
+      { mode: "demo", companyId: DEMO_TENANT.companyId },
+      { party: "ACME TEXTILES" },
+    );
   });
 });
 
@@ -56,6 +58,9 @@ describe("GET /api/v1/reports/outstanding/purchases", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual(report);
-    expect(outstandingService.getPurchases).toHaveBeenCalledWith({});
+    expect(outstandingService.getPurchases).toHaveBeenCalledWith(
+      { mode: "demo", companyId: DEMO_TENANT.companyId },
+      {},
+    );
   });
 });

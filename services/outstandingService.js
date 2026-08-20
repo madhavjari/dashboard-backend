@@ -11,8 +11,9 @@ function toNumber(value) {
   return Number(value) || 0;
 }
 
-function createBillPartyKey(billNo, party) {
+function createBillPartyKey(accountingCompanyId, billNo, party) {
   return JSON.stringify([
+    String(accountingCompanyId || ""),
     String(billNo || "")
       .trim()
       .toUpperCase(),
@@ -130,7 +131,11 @@ function buildOutstandingReport(entries, allocations, options) {
     }
     if (!entry.bill_no) continue;
 
-    const key = createBillPartyKey(entry.bill_no, entry.party);
+    const key = createBillPartyKey(
+      entry.accounting_company_id,
+      entry.bill_no,
+      entry.party,
+    );
     const existingEntry = entriesByBillAndParty.get(key);
     if (existingEntry) {
       existingEntry.billAmount += toNumber(entry.net_amount);
@@ -148,6 +153,7 @@ function buildOutstandingReport(entries, allocations, options) {
   for (const allocation of allocations) {
     const entry = entriesByBillAndParty.get(
       createBillPartyKey(
+        allocation.accounting_company_id,
         allocation.bill_no,
         allocation.payment_vouchers.party,
       ),
@@ -214,8 +220,8 @@ function buildOutstandingReport(entries, allocations, options) {
   return { summary, data, partySummary };
 }
 
-async function getOutstandingReport(options) {
-  const entries = await outstandingQueries.findBillEntries([
+async function getOutstandingReport(reportContext, options) {
+  const entries = await outstandingQueries.findBillEntries(reportContext, [
     ...options.transactionCodes,
     options.returnCode,
   ]);
@@ -230,6 +236,7 @@ async function getOutstandingReport(options) {
     billNumbers.length === 0
       ? []
       : await outstandingQueries.findPaymentAllocations(
+          reportContext,
           options.paymentCode,
           billNumbers,
         );
@@ -237,8 +244,8 @@ async function getOutstandingReport(options) {
   return buildOutstandingReport(entries, allocations, options);
 }
 
-async function getSales() {
-  return getOutstandingReport({
+async function getSales(reportContext) {
+  return getOutstandingReport(reportContext, {
     transactionCodes: [SALES_CODE],
     returnCode: SALES_RETURN_CODE,
     paymentCode: BANK_RECEIPT_CODE,
@@ -250,8 +257,8 @@ async function getSales() {
   });
 }
 
-async function getPurchases() {
-  return getOutstandingReport({
+async function getPurchases(reportContext) {
+  return getOutstandingReport(reportContext, {
     transactionCodes: PURCHASE_CODES,
     returnCode: PURCHASE_RETURN_CODE,
     paymentCode: BANK_PAYMENT_CODE,
