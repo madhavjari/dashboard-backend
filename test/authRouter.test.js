@@ -1,4 +1,5 @@
 const request = require("supertest");
+const jwt = require("jsonwebtoken");
 
 process.env.JWT_SECRET_KEY = "test-secret";
 process.env.JWT_ISSUER = "test-issuer";
@@ -9,6 +10,7 @@ process.env.EMAIL_FROM = "noreply@test.com";
 process.env.RESEND_API_KEY = "test-key";
 
 jest.mock("../db/authQueries");
+jest.mock("../db/accountQueries");
 jest.mock("../services/email");
 jest.mock("../utils/sendWithRetry", () => ({
   sendWithRetry: jest.fn((fn) => fn()),
@@ -17,6 +19,7 @@ jest.mock("argon2");
 
 const argon2 = require("argon2");
 const db = require("../db/authQueries");
+const accountDb = require("../db/accountQueries");
 const {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -36,6 +39,9 @@ const validRegisterBody = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  accountDb.getUserAccountAccess.mockResolvedValue({
+    accounts: [],
+  });
 });
 
 describe("POST /api/v1/auth/register", () => {
@@ -157,11 +163,32 @@ describe("POST /api/v1/auth/login", () => {
     argon2.verify.mockResolvedValue(true);
     db.createRefreshToken.mockResolvedValue(true);
 
+    accountDb.getUserAccountAccess.mockResolvedValue({
+      accounts: [
+        {
+          id: "company_1",
+          access: {
+            canViewLiveData: false,
+            reason: "SYNC_SETUP_REQUIRED",
+            canViewDemo: true,
+          },
+        },
+      ],
+    });
+
     const res = await request(app).post("/api/v1/auth/login").send(creds);
 
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toEqual(expect.any(String));
     expect(res.body.isVerified).toBe(true);
+    expect(res.body.accounts).toEqual([
+      expect.objectContaining({
+        id: "company_1",
+        access: expect.objectContaining({
+          reason: "SYNC_SETUP_REQUIRED",
+        }),
+      }),
+    ]);
 
     const cookies = res.headers["set-cookie"];
     expect(cookies).toBeDefined();
@@ -206,6 +233,56 @@ describe("POST /api/v1/auth/login", () => {
     expect(res.status).toBe(400);
     expect(res.body.errors).toHaveProperty("email");
     expect(res.body.errors).toHaveProperty("password");
+  });
+});
+
+describe("GET /api/v1/auth/me", () => {
+  it("returns the current user's account, sync, and subscription access", async () => {
+    const accessToken = jwt.sign(
+      { sub: "user_1" },
+      process.env.JWT_SECRET_KEY,
+      {
+        algorithm: "HS256",
+        issuer: process.env.JWT_ISSUER,
+        audience: process.env.JWT_AUDIENCE,
+        expiresIn: "15m",
+      },
+    );
+    db.findUser.mockResolvedValue({
+      id: "user_1",
+      email: "ada@example.com",
+      firstName: "Ada",
+      lastName: "Lovelace",
+      emailVerified: true,
+      companies: [{ companyId: "company_1", role: "OWNER" }],
+    });
+    accountDb.getUserAccountAccess.mockResolvedValue({
+      user: {
+        id: "user_1",
+        email: "ada@example.com",
+        isVerified: true,
+      },
+      accounts: [
+        {
+          id: "company_1",
+          subscription: { status: "PENDING" },
+          sync: { configured: false },
+          access: {
+            canViewLiveData: false,
+            reason: "SYNC_SETUP_REQUIRED",
+            canViewDemo: true,
+          },
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.accounts[0].subscription.status).toBe("PENDING");
+    expect(response.body.accounts[0].access.canViewDemo).toBe(true);
   });
 });
 

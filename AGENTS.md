@@ -7,7 +7,10 @@ CommonJS Node.js API built with Express 5. It handles:
 
 - user registration, email verification, login, refresh-token rotation,
   logout, and password resets;
-- companies, company memberships, and role-based sync-source provisioning;
+- customer accounts, account memberships, and account-level subscription
+  status;
+- computer-level sync-source and API-key provisioning;
+- discovery of multiple accounting companies from one sync computer;
 - API-key authentication for an external accounting-data sync client;
 - sales and purchase reports, including KPIs, monthly trends, party summaries,
   item summaries, and transaction details;
@@ -17,15 +20,23 @@ CommonJS Node.js API built with Express 5. It handles:
 
 The intended product flow is:
 
-1. A user registers and a company is created with that user as `OWNER`.
+1. A user registers and a customer account is created with that user as
+   `OWNER`. The existing `Company` model currently represents this account.
 2. The user verifies their email and signs in.
-3. An `OWNER` or `ADMIN` provisions a sync source and receives its API key once.
-4. An external accounting application sends bill/payment data using that key.
-5. The dashboard reads the synchronized accounting data and serves reports.
+3. An `OWNER` or `ADMIN` provisions a sync source representing one computer
+   and receives its API key once.
+4. The sync software uses that one key to register all accounting companies
+   found on the computer.
+5. Each accounting company is matched by trusted sync-source context plus its
+   stable external company ID. Company names are display values and may change.
+6. The external accounting application sends bill/payment data using the same
+   key and identifies which discovered accounting company owns each payload.
+7. The dashboard allows live account data during an active trial or paid
+   subscription. A separate demo option uses sample data.
 
 That flow is not fully connected yet: report APIs read the legacy Neon schema,
-while the new authenticated sync endpoint currently logs/acknowledges its body
-without writing it to either database.
+while the authenticated bill-data endpoint currently acknowledges its body
+without validating or writing accounting records.
 
 ## Current architecture
 
@@ -61,14 +72,32 @@ Do not treat the two Prisma clients as interchangeable.
 Configured by `prisma.config.js`, modeled in `prisma/schema.prisma`, and exposed
 as `prisma` from `lib/prisma.js`. It stores:
 
-- users, companies, memberships, and roles;
+- users, customer accounts, memberships, and roles;
+- account-level subscription status and trial/subscription dates;
 - email verification, password-reset, and rotating refresh tokens;
-- sync sources and hashed sync API keys;
+- computer-level sync sources and hashed sync API keys;
+- accounting companies discovered under each sync source;
 - the newer tenant-aware accounting models: `BillEntry`, `BillItem`,
   `PaymentVoucher`, and `PaymentAllocation`.
 
-Tenant-aware records carry `companyId` and `syncSourceId`. Preserve those
-boundaries in all queries and writes.
+Current model terminology is important:
+
+- `Company` is the customer account/workspace, not an individual company
+  inside the customer's accounting database.
+- `CompanyUser` is a user's membership in that account. Payment status is not
+  stored per user; it applies to the whole account.
+- `SyncSource` is one computer or sync installation.
+- `SyncApiKey` authenticates that computer. The current provisioning logic
+  allows one active sync key for the account.
+- `AccountingCompany` is an individual company discovered inside the
+  accounting database. It is unique by
+  `companyId + syncSourceId + externalId`.
+
+Tenant-aware records carry trusted account `companyId` and `syncSourceId`.
+`BillEntry` and `PaymentVoucher` now also have a nullable
+`accountingCompanyId` for the ingestion transition. New ingestion must resolve
+that value from the authenticated source plus the supplied external company ID.
+Never trust internal IDs supplied by the sync request body.
 
 ### Legacy report database (`NEON_DATABASE_URL`)
 
@@ -83,6 +112,27 @@ are not tenant-scoped in their current implementation.
 
 Run `npm run generate` after changing either Prisma schema. It generates both
 clients under `generated/prisma` and `generated/neon`.
+
+## Subscription and access states
+
+Subscription status belongs to the customer account and uses:
+
+| Status | Meaning |
+| --- | --- |
+| `PENDING` | Sync can be configured, but live account reports are not paid/approved |
+| `TRIAL` | The customer may view their own data until `trialEndsAt` |
+| `ACTIVE` | Paid access is active, optionally until `subscriptionEndsAt` |
+| `EXPIRED` | Trial or paid access has ended |
+| `SUSPENDED` | Access was stopped administratively |
+
+`db/accountQueries.js` derives frontend access information. An account needs
+both an active sync key and an active `TRIAL` or `ACTIVE` subscription to
+produce `canViewLiveData: true`. The response always includes
+`canViewDemo: true`.
+
+Demo and trial are different: demo means product-owned sample data; trial means
+temporarily showing the customer's own synchronized data. Trial start/expiry
+automation and admin subscription controls are not implemented yet.
 
 ## Domain rules and accounting codes
 
@@ -117,6 +167,8 @@ All current routes are under `/api/v1`.
 - `POST /auth/register`
 - `POST /auth/login`
 - `POST /auth/verify-email?token=...`
+- `GET /auth/me` — JWT required; returns the user, account memberships, sync
+  setup, subscription state, discovered companies, and derived access.
 - `POST /auth/resend-verification`
 - `POST /auth/forgot-password`
 - `POST /auth/verify-password-reset-token?token=...`
@@ -130,18 +182,34 @@ SHA-256 hashes, rotate on use, and are delivered in an HTTP-only
 `refresh_token` cookie scoped to `/api/v1/auth`. Reuse revokes the token family.
 Verification and reset secrets are also stored only as hashes.
 
+Successful login also returns an `accounts` array containing frontend routing
+information. The frontend should call `GET /auth/me` after a reload because
+subscription status can change without issuing a new JWT.
+
 ### Sync setup and ingestion
 
 - `GET /companies/:companyId/sync-sources` — JWT required; any company member.
 - `POST /companies/:companyId/sync-sources` — JWT and verified email required;
   only `OWNER` or `ADMIN`; plaintext API key is returned only on creation.
+- `POST /sync/companies` — sync API key required; upserts one to 100 accounting
+  companies using `externalCompanyId` and `name`.
 - `POST /billdata` — sync API key required through a Bearer token or temporary
-  `x-api-key` compatibility header.
+  `x-api-key` compatibility header; still acknowledgement-only.
 
 Sync keys look like `sync_<prefix>.<secret>` and only their SHA-256 hash is
 stored. `middleware/apiKeyAuth.js` attaches trusted `companyId` and
 `syncSourceId` as `req.syncAuth`; ingestion code must use that trusted context,
 never tenant identifiers supplied in the request body.
+
+`POST /sync/companies` accepts:
+
+```json
+{
+  "companies": [
+    { "externalCompanyId": "stable-guid-1", "name": "ABC Textiles" }
+  ]
+}
+```
 
 ### Dashboard and reports
 
@@ -156,9 +224,13 @@ never tenant identifiers supplied in the request body.
 - `GET /reports/outstanding/{sales,purchases}`
 - `GET /reports/cashflow` — placeholder returning an empty data array.
 
-Report and cashflow routes currently have no JWT middleware. Treat that as a
-known unfinished security/tenant-isolation area, not an intentional guarantee
-that accounting data is public.
+Report and cashflow routers use `resolveReportAccess`. A missing authorization
+header currently creates a demo context, while a supplied token must be valid.
+However, controllers and legacy Neon queries do not yet use that context to
+select an account or accounting company, and they do not enforce subscription
+access. Treat this as an unfinished security/tenant-isolation area. Do not add
+paid access on top of the legacy shared data; first connect ingestion and
+reports to `AccountingCompany`.
 
 ## Environment and local commands
 
@@ -174,6 +246,7 @@ local `.env`, which must not be committed):
 - `EMAIL_FROM`
 - `CLIENT_URL`
 - `NODE_ENV` (`production` enables secure, `SameSite=None` refresh cookies)
+- `DEMO_COMPANY_ID` (optional current demo-report context)
 
 Useful commands:
 
@@ -201,11 +274,14 @@ currently a read/report model.
   controllers/middleware; put Prisma access in `db/`.
 - Validate new external input with Zod and wire it through `validate(...)`.
 - Never return password hashes, stored token hashes, or sync-key hashes.
-- Never log plaintext credentials or full accounting payloads. The current
-  `syncController` logs its payload and should be corrected when ingestion is
-  implemented.
+- Never log plaintext credentials or full accounting payloads.
 - Scope every new primary-database accounting query by trusted `companyId` and,
-  where relevant, `syncSourceId`.
+  where relevant, `syncSourceId` and `accountingCompanyId`.
+- Resolve accounting companies using trusted
+  `req.syncAuth.companyId + req.syncAuth.syncSourceId + externalCompanyId`.
+  Do not identify them by mutable names, and never accept an internal account,
+  source, or accounting-company ID as authoritative sync input.
+- Keep demo sample data separate from customer trial/live data.
 - Use parameterized Prisma APIs or `Prisma.sql`; do not interpolate user input
   into raw SQL strings.
 - Add or update Jest tests with behavior changes. Mock database/email boundaries
@@ -217,10 +293,19 @@ currently a read/report model.
 
 ## Known incomplete or surprising behavior
 
-- `POST /api/v1/billdata` authenticates a sync key but only logs and acknowledges
-  the payload; it does not validate or persist accounting records.
+- `POST /api/v1/billdata` authenticates a sync key and acknowledges the payload,
+  but it does not validate or persist accounting records.
+- `POST /api/v1/sync/companies` stores discovered company metadata, but bill
+  and payment ingestion is not yet connected to `AccountingCompany`.
+- `accountingCompanyId` remains nullable on `BillEntry` and
+  `PaymentVoucher` so existing rows can be migrated; new ingestion should
+  always populate it.
+- Subscription/trial state is returned to the frontend, but report middleware
+  does not yet enforce it.
+- Trial activation and expiration persistence and platform-admin subscription
+  controls are not implemented.
 - Reports read the legacy Neon database rather than the new tenant-aware models.
-- Report routes are unauthenticated and not tenant-scoped.
+- Report queries are not account- or accounting-company-scoped.
 - Report dates are hard-coded to the 2025-26 financial year.
 - Dashboard summary and cashflow database queries are placeholders.
 - `GET /dashboard/summary` returns user data instead of a financial summary.

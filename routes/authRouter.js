@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const authController = require("../controllers/authController");
 const { validate } = require("../middleware/zodValidator");
+const verifyToken = require("../middleware/verifyToken");
 const {
   registerSchema,
   loginSchema,
@@ -22,6 +23,8 @@ authRouter.post(
   validate(loginSchema),
   authController.postLogin,
 );
+
+authRouter.get("/api/v1/auth/me", verifyToken, authController.getCurrentUser);
 
 authRouter.post(
   "/api/v1/auth/verify-email",

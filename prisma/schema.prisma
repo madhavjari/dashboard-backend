@@ -14,13 +14,27 @@ enum Role {
   VIEWER
 }
 
+enum SubscriptionStatus {
+  PENDING
+  TRIAL
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
 model Company {
-  id          String        @id @default(uuid())
-  name        String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @default(now()) @updatedAt
-  users       CompanyUser[]
-  syncSources SyncSource[]
+  id                    String              @id @default(uuid())
+  name                  String
+  subscriptionStatus    SubscriptionStatus  @default(PENDING)
+  trialStartedAt        DateTime?
+  trialEndsAt           DateTime?
+  subscriptionStartedAt DateTime?
+  subscriptionEndsAt    DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @default(now()) @updatedAt
+  users                 CompanyUser[]
+  syncSources           SyncSource[]
+  accountingCompanies   AccountingCompany[]
 }
 
 model User {
@@ -108,20 +122,43 @@ model Apikey {
 }
 
 model SyncSource {
-  id              String           @id @default(uuid())
-  companyId       String
-  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name            String
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @default(now()) @updatedAt
-  lastSyncedAt    DateTime?
-  apiKeys         SyncApiKey[]
-  billEntries     BillEntry[]
-  paymentVouchers PaymentVoucher[]
+  id                  String              @id @default(uuid())
+  companyId           String
+  company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name                String
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @default(now()) @updatedAt
+  lastSyncedAt        DateTime?
+  apiKeys             SyncApiKey[]
+  accountingCompanies AccountingCompany[]
+  billEntries         BillEntry[]
+  paymentVouchers     PaymentVoucher[]
 
   // Enables tenant-safe composite foreign keys from synchronized records.
   @@unique([companyId, id])
   @@index([companyId])
+}
+
+// An accounting company discovered by a sync installation. Company is the
+// customer account; this model represents each company inside its accounting
+// database. The external ID must be stable even when the display name changes.
+model AccountingCompany {
+  id              String           @id @default(uuid())
+  companyId       String
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  syncSourceId    String
+  syncSource      SyncSource       @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
+  externalId      String           @db.VarChar(200)
+  name            String           @db.VarChar(255)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+  billEntries     BillEntry[]
+  paymentVouchers PaymentVoucher[]
+
+  @@unique([companyId, id])
+  @@unique([companyId, syncSourceId, externalId])
+  @@index([companyId, name])
+  @@index([syncSourceId])
 }
 
 model SyncApiKey {
@@ -141,36 +178,39 @@ model SyncApiKey {
 }
 
 model BillEntry {
-  id               BigInt     @id @default(autoincrement())
-  companyId        String
-  syncSourceId     String
-  syncSource       SyncSource @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
-  entryId          String     @db.VarChar(100)
-  compNo           String     @db.VarChar(100)
-  code             String?    @db.VarChar(50)
-  book             String?    @db.VarChar(100)
-  billNo           String?    @db.VarChar(100)
-  billDate         DateTime?  @db.Date
-  party            String?    @db.VarChar(255)
-  partyCode        String?    @db.VarChar(100)
-  agent            String?    @db.VarChar(255)
-  grossAmount      Decimal?   @db.Decimal(18, 2)
-  netAmount        Decimal?   @db.Decimal(18, 2)
-  cgst             Decimal?   @default(0) @db.Decimal(18, 2)
-  sgst             Decimal?   @default(0) @db.Decimal(18, 2)
-  igst             Decimal?   @default(0) @db.Decimal(18, 2)
-  sourceCreatedAt  DateTime?
-  sourceModifiedAt DateTime?
-  sourceModifyTime String?    @db.VarChar(50)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @default(now()) @updatedAt
-  items            BillItem[]
+  id                  BigInt             @id @default(autoincrement())
+  companyId           String
+  syncSourceId        String
+  syncSource          SyncSource         @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
+  accountingCompanyId String?
+  accountingCompany   AccountingCompany? @relation(fields: [companyId, accountingCompanyId], references: [companyId, id], onDelete: Restrict)
+  entryId             String             @db.VarChar(100)
+  compNo              String             @db.VarChar(100)
+  code                String?            @db.VarChar(50)
+  book                String?            @db.VarChar(100)
+  billNo              String?            @db.VarChar(100)
+  billDate            DateTime?          @db.Date
+  party               String?            @db.VarChar(255)
+  partyCode           String?            @db.VarChar(100)
+  agent               String?            @db.VarChar(255)
+  grossAmount         Decimal?           @db.Decimal(18, 2)
+  netAmount           Decimal?           @db.Decimal(18, 2)
+  cgst                Decimal?           @default(0) @db.Decimal(18, 2)
+  sgst                Decimal?           @default(0) @db.Decimal(18, 2)
+  igst                Decimal?           @default(0) @db.Decimal(18, 2)
+  sourceCreatedAt     DateTime?
+  sourceModifiedAt    DateTime?
+  sourceModifyTime    String?            @db.VarChar(50)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @default(now()) @updatedAt
+  items               BillItem[]
 
   @@unique([companyId, id])
   @@unique([companyId, syncSourceId, compNo, entryId])
   @@index([companyId, billDate])
   @@index([companyId, code, billDate])
   @@index([companyId, party])
+  @@index([companyId, accountingCompanyId, billDate])
 }
 
 model BillItem {
@@ -218,34 +258,37 @@ model BillItem {
 }
 
 model PaymentVoucher {
-  id               BigInt              @id @default(autoincrement())
-  companyId        String
-  syncSourceId     String
-  syncSource       SyncSource          @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
-  entryId          String              @db.VarChar(100)
-  compNo           String              @db.VarChar(100)
-  voucherDate      DateTime?           @db.Date
-  mode             String?             @db.VarChar(100)
-  voucherType      String?             @db.VarChar(100)
-  slipNo           String?             @db.VarChar(100)
-  referenceNo      String?             @db.VarChar(100)
-  party            String?             @db.VarChar(255)
-  chequeNo         String?             @db.VarChar(100)
-  chequeDate       DateTime?           @db.Date
-  chequeBank       String?             @db.VarChar(255)
-  clearingDate     DateTime?           @db.Date
-  netAmount        Decimal?            @db.Decimal(18, 2)
-  remarks          String?
-  sourceModifiedAt DateTime?
-  sourceModifyTime String?             @db.VarChar(50)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @default(now()) @updatedAt
-  allocations      PaymentAllocation[]
+  id                  BigInt              @id @default(autoincrement())
+  companyId           String
+  syncSourceId        String
+  syncSource          SyncSource          @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
+  accountingCompanyId String?
+  accountingCompany   AccountingCompany?  @relation(fields: [companyId, accountingCompanyId], references: [companyId, id], onDelete: Restrict)
+  entryId             String              @db.VarChar(100)
+  compNo              String              @db.VarChar(100)
+  voucherDate         DateTime?           @db.Date
+  mode                String?             @db.VarChar(100)
+  voucherType         String?             @db.VarChar(100)
+  slipNo              String?             @db.VarChar(100)
+  referenceNo         String?             @db.VarChar(100)
+  party               String?             @db.VarChar(255)
+  chequeNo            String?             @db.VarChar(100)
+  chequeDate          DateTime?           @db.Date
+  chequeBank          String?             @db.VarChar(255)
+  clearingDate        DateTime?           @db.Date
+  netAmount           Decimal?            @db.Decimal(18, 2)
+  remarks             String?
+  sourceModifiedAt    DateTime?
+  sourceModifyTime    String?             @db.VarChar(50)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @default(now()) @updatedAt
+  allocations         PaymentAllocation[]
 
   @@unique([companyId, id])
   @@unique([companyId, syncSourceId, compNo, entryId])
   @@index([companyId, voucherDate])
   @@index([companyId, party])
+  @@index([companyId, accountingCompanyId, voucherDate])
 }
 
 model PaymentAllocation {

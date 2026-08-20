@@ -16,6 +16,7 @@ const {
   findPasswordResetToken,
   updateAndDeletePasswordResetToken,
 } = require("../db/authQueries");
+const { getUserAccountAccess } = require("../db/accountQueries");
 const {
   getAccessToken,
   generatedRefreshToken,
@@ -84,6 +85,7 @@ async function postLogin(req, res) {
         message: "Invalid email or password",
       });
     }
+    const accountAccess = await getUserAccountAccess(user.id);
     const accessToken = getAccessToken(user.id);
     const { refreshToken, refreshTokenHash } = generatedRefreshToken();
     await createRefreshToken({
@@ -94,7 +96,11 @@ async function postLogin(req, res) {
     });
     res
       .cookie("refresh_token", refreshToken, refreshCookieOptions)
-      .json({ accessToken, isVerified: user.emailVerified });
+      .json({
+        accessToken,
+        isVerified: user.emailVerified,
+        accounts: accountAccess?.accounts ?? [],
+      });
   } catch (err) {
     console.error(err);
     return res.status(500).json({
@@ -296,6 +302,20 @@ async function postRefreshToken(req, res) {
   }
 }
 
+async function getCurrentUser(req, res) {
+  try {
+    const accountAccess = await getUserAccountAccess(req.user.id);
+    if (!accountAccess) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json(accountAccess);
+  } catch (error) {
+    console.error("Failed to get current user:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 async function postLogout(req, res) {
   try {
     const presentedToken = req.cookies?.refresh_token;
@@ -315,6 +335,7 @@ module.exports = {
   postLogin,
   postRefreshToken,
   postLogout,
+  getCurrentUser,
   postVerifyEmail,
   postResendVerification,
   postForgotPassword,

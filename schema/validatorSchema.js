@@ -132,6 +132,211 @@ const createSyncSourceSchema = companyIdParamsSchema.extend({
   }),
 });
 
+const syncCompaniesSchema = z.object({
+  body: z
+    .object({
+      companies: z
+        .array(
+          z
+            .object({
+              externalCompanyId: z
+                .string()
+                .trim()
+                .min(1, "External company ID is required")
+                .max(200, "External company ID must be 200 characters or fewer"),
+              name: z
+                .string()
+                .trim()
+                .min(1, "Company name is required")
+                .max(255, "Company name must be 255 characters or fewer"),
+            })
+            .strict(),
+        )
+        .min(1, "At least one accounting company is required")
+        .max(100, "A maximum of 100 accounting companies is allowed"),
+    })
+    .superRefine(({ companies }, context) => {
+      const seen = new Set();
+      companies.forEach((company, index) => {
+        if (seen.has(company.externalCompanyId)) {
+          context.addIssue({
+            code: "custom",
+            path: ["companies", index, "externalCompanyId"],
+            message: "External company IDs must be unique",
+          });
+        }
+        seen.add(company.externalCompanyId);
+      });
+    }),
+});
+
+const externalRecordIdSchema = (label) =>
+  z
+    .union([z.string(), z.number().int().safe()])
+    .transform((value) => String(value).trim())
+    .pipe(
+      z
+        .string()
+        .min(1, `${label} is required`)
+        .max(100, `${label} must be 100 characters or fewer`),
+    );
+
+const nullableTextSchema = (maximum) =>
+  z.preprocess(
+    (value) =>
+      value === undefined || value === null || value === "" ? null : value,
+    z.string().trim().max(maximum).nullable(),
+  );
+
+const decimalSchema = z.union([
+  z.number().finite(),
+  z
+    .string()
+    .trim()
+    .regex(
+      /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/,
+      "Value must be a valid number",
+    ),
+]);
+
+const nullableDecimalSchema = z.preprocess(
+  (value) =>
+    value === undefined || value === null || value === "" ? null : value,
+  decimalSchema.nullable(),
+);
+
+const nullableDateSchema = z.preprocess(
+  (value) =>
+    value === undefined || value === null || value === "" ? null : value,
+  z.coerce.date().nullable(),
+);
+
+const billItemSchema = z
+  .object({
+    entryId: externalRecordIdSchema("Item entry ID").nullable().optional(),
+    serial: nullableTextSchema(50),
+    itemCode: nullableTextSchema(100),
+    itemName: nullableTextSchema(255),
+    category: nullableTextSchema(255),
+    group: nullableTextSchema(255),
+    brand: nullableTextSchema(255),
+    quality: nullableTextSchema(255),
+    design: nullableTextSchema(255),
+    colour: nullableTextSchema(255),
+    pattern: nullableTextSchema(255),
+    pcs: nullableDecimalSchema,
+    meters: nullableDecimalSchema,
+    quantity: nullableDecimalSchema,
+    weight: nullableDecimalSchema,
+    per: nullableTextSchema(100),
+    discountPercent: nullableDecimalSchema,
+    discount: nullableDecimalSchema,
+    rate: nullableDecimalSchema,
+    amount: nullableDecimalSchema,
+    taxable: nullableDecimalSchema,
+    finalAmount: nullableDecimalSchema,
+    cgstRate: nullableDecimalSchema,
+    cgstAmount: nullableDecimalSchema,
+    sgstRate: nullableDecimalSchema,
+    sgstAmount: nullableDecimalSchema,
+    igstRate: nullableDecimalSchema,
+    igstAmount: nullableDecimalSchema,
+    cessRate: nullableDecimalSchema,
+    cessAmount: nullableDecimalSchema,
+    remarks: nullableTextSchema(10_000),
+  })
+  .strict();
+
+const billSchema = z
+  .object({
+    entryId: externalRecordIdSchema("Entry ID"),
+    compNo: externalRecordIdSchema("Company number"),
+    code: nullableTextSchema(50),
+    book: nullableTextSchema(100),
+    billNo: nullableTextSchema(100),
+    date: nullableDateSchema,
+    party: nullableTextSchema(255),
+    partyCode: nullableTextSchema(100),
+    agent: nullableTextSchema(255),
+    grossAmount: nullableDecimalSchema,
+    netAmount: nullableDecimalSchema,
+    cgst: nullableDecimalSchema,
+    sgst: nullableDecimalSchema,
+    igst: nullableDecimalSchema,
+    entryDate: nullableDateSchema,
+    modifyDate: nullableDateSchema,
+    modifyTime: nullableTextSchema(50),
+    items: z.array(billItemSchema).max(1_000).default([]),
+  })
+  .strict();
+
+const paymentAllocationSchema = z
+  .object({
+    entryId: externalRecordIdSchema("Allocation entry ID").nullable().optional(),
+    code: nullableTextSchema(100),
+    billNo: nullableTextSchema(100),
+    date: nullableDateSchema,
+    mode: nullableTextSchema(100),
+    billAmt: nullableDecimalSchema,
+    adjustAmt: nullableDecimalSchema,
+    unAdjAmt: nullableDecimalSchema,
+    bAlAmt: nullableDecimalSchema,
+    status: nullableTextSchema(100),
+  })
+  .strict();
+
+const paymentVoucherSchema = z
+  .object({
+    entryId: externalRecordIdSchema("Entry ID"),
+    compNo: externalRecordIdSchema("Company number"),
+    date: nullableDateSchema,
+    mode: nullableTextSchema(100),
+    vchrType: nullableTextSchema(100),
+    slipNo: nullableTextSchema(100),
+    refNo: nullableTextSchema(100),
+    party: nullableTextSchema(255),
+    chequeNo: nullableTextSchema(100),
+    chequeDate: nullableDateSchema,
+    chequeBank: nullableTextSchema(255),
+    clearingDate: nullableDateSchema,
+    netAmount: nullableDecimalSchema,
+    remarks: nullableTextSchema(10_000),
+    modifyDate: nullableDateSchema,
+    modifyTime: nullableTextSchema(50),
+    items: z.array(paymentAllocationSchema).max(1_000).default([]),
+  })
+  .strict();
+
+function synchronizedRecordBatchSchema(recordSchema, recordLabel) {
+  return z.object({
+    body: z
+      .array(recordSchema)
+      .min(1, `At least one ${recordLabel} is required`)
+      .max(500, `A maximum of 500 ${recordLabel}s is allowed per request`)
+      .superRefine((records, context) => {
+        const seen = new Set();
+
+        records.forEach((record, index) => {
+          const key = `${record.compNo}\u0000${record.entryId}`;
+          if (seen.has(key)) {
+            context.addIssue({
+              code: "custom",
+              path: [index, "entryId"],
+              message: `Duplicate ${recordLabel} for this company number`,
+            });
+          }
+          seen.add(key);
+        });
+      }),
+  });
+}
+
+const syncBillsSchema = synchronizedRecordBatchSchema(billSchema, "bill");
+const syncVouchersSchema = synchronizedRecordBatchSchema(
+  paymentVoucherSchema,
+  "voucher",
+);
+
 const partyDetailsSchema = z.object({
   query: z.object({
     party: z
@@ -162,6 +367,9 @@ module.exports = {
   tokenSchema,
   companyIdParamsSchema,
   createSyncSourceSchema,
+  syncCompaniesSchema,
+  syncBillsSchema,
+  syncVouchersSchema,
   partyDetailsSchema,
   itemDetailsSchema,
 };
