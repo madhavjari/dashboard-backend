@@ -1,7 +1,4 @@
-const DEVELOPMENT_ORIGINS = [
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
+const DEVELOPMENT_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
 
 function normalizeOrigin(value) {
   if (!value || typeof value !== "string") return null;
@@ -33,8 +30,7 @@ function isAllowedOrigin(origin) {
 
   const normalizedOrigin = normalizeOrigin(origin);
   return (
-    normalizedOrigin !== null &&
-    getAllowedOrigins().includes(normalizedOrigin)
+    normalizedOrigin !== null && getAllowedOrigins().includes(normalizedOrigin)
   );
 }
 
