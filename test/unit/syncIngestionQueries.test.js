@@ -34,6 +34,8 @@ beforeEach(() => {
 describe("ingestBills", () => {
   const bills = [
     {
+      financialYear: "2026-2027",
+      isOpening: true,
       entryId: "100",
       compNo: "1",
       code: "S",
@@ -121,9 +123,10 @@ describe("ingestBills", () => {
     });
     expect(tx.billEntry.upsert).toHaveBeenCalledWith({
       where: {
-        companyId_syncSourceId_compNo_entryId: {
+        companyId_syncSourceId_financialYear_compNo_entryId: {
           companyId: "account_1",
           syncSourceId: "source_1",
+          financialYear: "2026-2027",
           compNo: "1",
           entryId: "100",
         },
@@ -132,6 +135,8 @@ describe("ingestBills", () => {
         companyId: "account_1",
         syncSourceId: "source_1",
         accountingCompanyId: "books_1",
+        financialYear: "2026-2027",
+        isOpening: true,
         compNo: "1",
         entryId: "100",
         billDate: new Date("2026-08-20T00:00:00.000Z"),
@@ -194,6 +199,8 @@ describe("ingestBills", () => {
 describe("ingestPaymentVouchers", () => {
   const vouchers = [
     {
+      financialYear: "2026-2027",
+      isOpening: false,
       entryId: "200",
       compNo: "2",
       date: new Date("2026-08-20T00:00:00.000Z"),
@@ -248,9 +255,10 @@ describe("ingestPaymentVouchers", () => {
     });
     expect(tx.paymentVoucher.upsert).toHaveBeenCalledWith({
       where: {
-        companyId_syncSourceId_compNo_entryId: {
+        companyId_syncSourceId_financialYear_compNo_entryId: {
           companyId: "account_1",
           syncSourceId: "source_1",
+          financialYear: "2026-2027",
           compNo: "2",
           entryId: "200",
         },
@@ -259,6 +267,8 @@ describe("ingestPaymentVouchers", () => {
         companyId: "account_1",
         syncSourceId: "source_1",
         accountingCompanyId: "books_2",
+        financialYear: "2026-2027",
+        isOpening: false,
         voucherType: "Receipt",
         referenceNo: "REF-1",
       }),

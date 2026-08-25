@@ -211,6 +211,16 @@ const nullableDateSchema = z.preprocess(
   z.coerce.date().nullable(),
 );
 
+const financialYearSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{4}$/, "Financial year must use YYYY-YYYY format")
+  .refine((value) => {
+    const [fromYear, toYear] = value.split("-").map(Number);
+    return toYear === fromYear + 1;
+  }, "Financial year must contain consecutive years")
+  .default("2025-2026");
+
 const billItemSchema = z
   .object({
     entryId: externalRecordIdSchema("Item entry ID").nullable().optional(),
@@ -249,6 +259,8 @@ const billItemSchema = z
 
 const billSchema = z
   .object({
+    financialYear: financialYearSchema,
+    isOpening: z.boolean().default(false),
     entryId: externalRecordIdSchema("Entry ID"),
     compNo: externalRecordIdSchema("Company number"),
     code: nullableTextSchema(50),
@@ -287,6 +299,8 @@ const paymentAllocationSchema = z
 
 const paymentVoucherSchema = z
   .object({
+    financialYear: financialYearSchema,
+    isOpening: z.boolean().default(false),
     entryId: externalRecordIdSchema("Entry ID"),
     compNo: externalRecordIdSchema("Company number"),
     date: nullableDateSchema,
@@ -317,7 +331,7 @@ function synchronizedRecordBatchSchema(recordSchema, recordLabel) {
         const seen = new Set();
 
         records.forEach((record, index) => {
-          const key = `${record.compNo}\u0000${record.entryId}`;
+          const key = `${record.financialYear}\u0000${record.compNo}\u0000${record.entryId}`;
           if (seen.has(key)) {
             context.addIssue({
               code: "custom",

@@ -2,6 +2,7 @@ const { prisma } = require("../lib/prisma");
 
 const nullable = (value) => value ?? null;
 const decimalOrZero = (value) => value ?? 0;
+const DEFAULT_FINANCIAL_YEAR = "2025-2026";
 
 async function resolveAccountingCompanies(
   tx,
@@ -35,6 +36,8 @@ async function resolveAccountingCompanies(
 function mapBillData(bill, accountingCompanyId) {
   return {
     accountingCompanyId,
+    financialYear: bill.financialYear ?? DEFAULT_FINANCIAL_YEAR,
+    isOpening: bill.isOpening === true,
     entryId: bill.entryId,
     compNo: bill.compNo,
     code: nullable(bill.code),
@@ -96,6 +99,8 @@ function mapBillItem(item, { companyId, billEntryId }) {
 function mapVoucherData(voucher, accountingCompanyId) {
   return {
     accountingCompanyId,
+    financialYear: voucher.financialYear ?? DEFAULT_FINANCIAL_YEAR,
+    isOpening: voucher.isOpening === true,
     entryId: voucher.entryId,
     compNo: voucher.compNo,
     voucherDate: nullable(voucher.date),
@@ -157,9 +162,10 @@ async function ingestBills({ companyId, syncSourceId, bills }) {
         const billData = mapBillData(bill, accountingCompany.id);
         const storedBill = await tx.billEntry.upsert({
           where: {
-            companyId_syncSourceId_compNo_entryId: {
+            companyId_syncSourceId_financialYear_compNo_entryId: {
               companyId,
               syncSourceId,
+              financialYear: billData.financialYear,
               compNo: bill.compNo,
               entryId: bill.entryId,
             },
@@ -241,9 +247,10 @@ async function ingestPaymentVouchers({
         );
         const storedVoucher = await tx.paymentVoucher.upsert({
           where: {
-            companyId_syncSourceId_compNo_entryId: {
+            companyId_syncSourceId_financialYear_compNo_entryId: {
               companyId,
               syncSourceId,
+              financialYear: voucherData.financialYear,
               compNo: voucher.compNo,
               entryId: voucher.entryId,
             },

@@ -11,6 +11,7 @@ const purchaseReportRouter = require("./routes/purchaseReportRouter");
 const outstandingRouter = require("./routes/outstandingRouter");
 const cashflowRouter = require("./routes/cashflowRouter");
 const syncSourceRouter = require("./routes/syncSourceRouter");
+const financialYearRouter = require("./routes/financialYearRouter");
 
 const app = express();
 
@@ -39,5 +40,6 @@ app.use(salesReportRouter);
 app.use(purchaseReportRouter);
 app.use(outstandingRouter);
 app.use(cashflowRouter);
+app.use(financialYearRouter);
 
 module.exports = app;

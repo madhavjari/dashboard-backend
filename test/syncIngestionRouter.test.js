@@ -24,6 +24,8 @@ const syncAuth = {
 };
 
 const validBill = {
+  financialYear: "2026-2027",
+  isOpening: false,
   entryId: 100,
   compNo: 1,
   code: "S",
@@ -51,6 +53,8 @@ const validBill = {
 };
 
 const validVoucher = {
+  financialYear: "2026-2027",
+  isOpening: true,
   entryId: 200,
   compNo: 1,
   date: "2026-08-20T00:00:00.000Z",
@@ -132,6 +136,8 @@ describe("POST /api/v1/sync/bills", () => {
       syncSourceId: "source_1",
       bills: [
         expect.objectContaining({
+          financialYear: "2026-2027",
+          isOpening: false,
           entryId: "100",
           compNo: "1",
           date: new Date("2026-08-20T00:00:00.000Z"),
@@ -142,6 +148,30 @@ describe("POST /api/v1/sync/bills", () => {
         }),
       ],
     });
+  });
+
+  it("accepts the same source identity in different financial years", async () => {
+    ingestBills.mockResolvedValue({
+      status: "ok",
+      count: 2,
+      accountingCompanyCount: 1,
+    });
+
+    const response = await request(app)
+      .post("/api/v1/sync/bills")
+      .set("Authorization", "Bearer sync_abc.secret")
+      .send([
+        validBill,
+        { ...validBill, financialYear: "2025-2026" },
+      ]);
+
+    expect(response.status).toBe(200);
+    expect(ingestBills).toHaveBeenCalledWith(
+      expect.objectContaining({ bills: expect.arrayContaining([
+        expect.objectContaining({ financialYear: "2025-2026" }),
+        expect.objectContaining({ financialYear: "2026-2027" }),
+      ]) }),
+    );
   });
 
   it("rejects an unregistered CompNo before accepting the upload", async () => {
@@ -184,6 +214,8 @@ describe("POST /api/v1/sync/vouchers", () => {
       syncSourceId: "source_1",
       vouchers: [
         expect.objectContaining({
+          financialYear: "2026-2027",
+          isOpening: true,
           entryId: "200",
           compNo: "1",
           date: new Date("2026-08-20T00:00:00.000Z"),

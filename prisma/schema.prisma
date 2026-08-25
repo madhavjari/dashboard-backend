@@ -172,6 +172,8 @@ model BillEntry {
   syncSource          SyncSource         @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
   accountingCompanyId String?
   accountingCompany   AccountingCompany? @relation(fields: [companyId, accountingCompanyId], references: [companyId, id], onDelete: Restrict)
+  financialYear       String             @default("2025-2026") @db.VarChar(9)
+  isOpening           Boolean            @default(false)
   entryId             String             @db.VarChar(100)
   compNo              String             @db.VarChar(100)
   code                String?            @db.VarChar(50)
@@ -194,11 +196,12 @@ model BillEntry {
   items               BillItem[]
 
   @@unique([companyId, id])
-  @@unique([companyId, syncSourceId, compNo, entryId])
+  @@unique([companyId, syncSourceId, financialYear, compNo, entryId], map: "BillEntry_sync_financial_year_key")
   @@index([companyId, billDate])
   @@index([companyId, code, billDate])
   @@index([companyId, party])
   @@index([companyId, accountingCompanyId, billDate])
+  @@index([companyId, financialYear, isOpening])
 }
 
 model BillItem {
@@ -252,6 +255,8 @@ model PaymentVoucher {
   syncSource          SyncSource          @relation(fields: [companyId, syncSourceId], references: [companyId, id], onDelete: Cascade)
   accountingCompanyId String?
   accountingCompany   AccountingCompany?  @relation(fields: [companyId, accountingCompanyId], references: [companyId, id], onDelete: Restrict)
+  financialYear       String              @default("2025-2026") @db.VarChar(9)
+  isOpening           Boolean             @default(false)
   entryId             String              @db.VarChar(100)
   compNo              String              @db.VarChar(100)
   voucherDate         DateTime?           @db.Date
@@ -273,10 +278,11 @@ model PaymentVoucher {
   allocations         PaymentAllocation[]
 
   @@unique([companyId, id])
-  @@unique([companyId, syncSourceId, compNo, entryId])
+  @@unique([companyId, syncSourceId, financialYear, compNo, entryId], map: "PaymentVoucher_sync_financial_year_key")
   @@index([companyId, voucherDate])
   @@index([companyId, party])
   @@index([companyId, accountingCompanyId, voucherDate])
+  @@index([companyId, financialYear, isOpening])
 }
 
 model PaymentAllocation {
