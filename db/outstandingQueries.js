@@ -1,10 +1,11 @@
 const { prisma } = require("../lib/prisma.js");
 const { createCompanyWhere } = require("./reportScope");
 
-async function findBillEntries(reportContext, codes) {
+async function findBillEntries(reportContext, codes, financialYear) {
   const rows = await prisma.billEntry.findMany({
     where: {
       ...createCompanyWhere(reportContext),
+      financialYear,
       code: { in: codes },
     },
     select: {
@@ -32,12 +33,14 @@ async function findPaymentAllocations(
   reportContext,
   code,
   billNumbers,
+  financialYear,
 ) {
   const rows = await prisma.paymentAllocation.findMany({
     where: {
       ...createCompanyWhere(reportContext),
       code,
       billNo: { in: billNumbers },
+      paymentVoucher: { financialYear },
     },
     select: {
       billNo: true,

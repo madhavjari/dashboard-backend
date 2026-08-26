@@ -32,7 +32,10 @@ describe("reportControllerFactory.getPartyWiseReport", () => {
       json: jest.fn().mockReturnThis(),
     };
 
-    await controller.getPartyWiseReport({}, res);
+    await controller.getPartyWiseReport(
+      { query: { financialYear: "2026-2027" } },
+      res,
+    );
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
@@ -41,6 +44,17 @@ describe("reportControllerFactory.getPartyWiseReport", () => {
         { party: "NO BALANCE", netAmount: 500, outstandingAmount: 0 },
       ],
       outstandingSummary: { totalToCollect: 275 },
+    });
+    expect(getPartyDetails).toHaveBeenCalledWith(
+      undefined,
+      "2026-04-01",
+      "2027-04-01",
+      ["S"],
+      ["SR"],
+      ["S", "SR"],
+    );
+    expect(getOutstandingReport).toHaveBeenCalledWith(undefined, {
+      financialYear: "2026-2027",
     });
   });
 });

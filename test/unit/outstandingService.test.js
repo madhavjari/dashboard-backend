@@ -78,6 +78,7 @@ describe("outstandingService.getSales", () => {
       undefined,
       "BR",
       ["S-100", "S-101"],
+      "2025-2026",
     );
   });
 
@@ -219,11 +220,13 @@ describe("outstandingService.getPurchases", () => {
     expect(outstandingQueries.findBillEntries).toHaveBeenCalledWith(
       undefined,
       ["P", "OP", "FJ", "PR"],
+      "2025-2026",
     );
     expect(outstandingQueries.findPaymentAllocations).toHaveBeenCalledWith(
       undefined,
       "BP",
       ["P-100"],
+      "2025-2026",
     );
   });
 });

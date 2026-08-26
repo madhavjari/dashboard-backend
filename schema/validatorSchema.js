@@ -221,6 +221,14 @@ const financialYearSchema = z
   }, "Financial year must contain consecutive years")
   .default("2025-2026");
 
+const reportPeriodSchema = z.object({
+  query: z
+    .object({
+      financialYear: financialYearSchema,
+    })
+    .passthrough(),
+});
+
 const billItemSchema = z
   .object({
     entryId: externalRecordIdSchema("Item entry ID").nullable().optional(),
@@ -353,6 +361,7 @@ const syncVouchersSchema = synchronizedRecordBatchSchema(
 
 const partyDetailsSchema = z.object({
   query: z.object({
+    financialYear: financialYearSchema,
     party: z
       .string({ error: "Party is required" })
       .trim()
@@ -364,6 +373,7 @@ const partyDetailsSchema = z.object({
 
 const itemDetailsSchema = z.object({
   query: z.object({
+    financialYear: financialYearSchema,
     item: z
       .string({ error: "Item is required" })
       .trim()
@@ -384,6 +394,7 @@ module.exports = {
   syncCompaniesSchema,
   syncBillsSchema,
   syncVouchersSchema,
+  reportPeriodSchema,
   partyDetailsSchema,
   itemDetailsSchema,
 };

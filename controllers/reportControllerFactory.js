@@ -5,11 +5,7 @@ const {
   getItemWiseSummary,
   getIndividualPartyData,
 } = require("../services/reportService.js");
-
-const REPORT_PERIOD = {
-  fromDate: "2025-04-01",
-  toDate: "2026-04-01",
-};
+const { getFinancialYearPeriod } = require("../utils/financialYear");
 
 function sendInternalServerError(res, error) {
   console.error(error);
@@ -45,10 +41,11 @@ function createReportController(
   return {
     async getKPISummary(req, res) {
       try {
+        const reportPeriod = getFinancialYearPeriod(req.query?.financialYear);
         const data = await getKPI(
           req.reportContext,
-          REPORT_PERIOD.fromDate,
-          REPORT_PERIOD.toDate,
+          reportPeriod.fromDate,
+          reportPeriod.toDate,
           billCodes,
           returnCodes,
         );
@@ -61,10 +58,11 @@ function createReportController(
 
     async getMonthlyReport(req, res) {
       try {
+        const reportPeriod = getFinancialYearPeriod(req.query?.financialYear);
         const data = await getMonthlySales(
           req.reportContext,
-          REPORT_PERIOD.fromDate,
-          REPORT_PERIOD.toDate,
+          reportPeriod.fromDate,
+          reportPeriod.toDate,
           billCodes,
           returnCodes,
         );
@@ -77,16 +75,19 @@ function createReportController(
 
     async getPartyWiseReport(req, res) {
       try {
+        const reportPeriod = getFinancialYearPeriod(req.query?.financialYear);
         const [partyData, outstandingReport] = await Promise.all([
           getPartyDetails(
             req.reportContext,
-            REPORT_PERIOD.fromDate,
-            REPORT_PERIOD.toDate,
+            reportPeriod.fromDate,
+            reportPeriod.toDate,
             billCodes,
             returnCodes,
             allCodes,
           ),
-          getOutstandingReport(req.reportContext),
+          getOutstandingReport(req.reportContext, {
+            financialYear: reportPeriod.financialYear,
+          }),
         ]);
         const data = addOutstandingAmounts(
           partyData,
@@ -105,10 +106,11 @@ function createReportController(
 
     async getItemWiseReport(req, res) {
       try {
+        const reportPeriod = getFinancialYearPeriod(req.query?.financialYear);
         const { summary, topItems, returnItems } = await getItemWiseSummary(
           req.reportContext,
-          REPORT_PERIOD.fromDate,
-          REPORT_PERIOD.toDate,
+          reportPeriod.fromDate,
+          reportPeriod.toDate,
           billCodes,
           returnCodes,
         );
@@ -123,19 +125,20 @@ function createReportController(
       const { party } = req.query;
 
       try {
+        const reportPeriod = getFinancialYearPeriod(req.query?.financialYear);
         const [data, summary] = await Promise.all([
           getIndividualPartyData(
             req.reportContext,
-            REPORT_PERIOD.fromDate,
-            REPORT_PERIOD.toDate,
+            reportPeriod.fromDate,
+            reportPeriod.toDate,
             "party",
             party,
             allCodes,
           ),
           getPartyDetails(
             req.reportContext,
-            REPORT_PERIOD.fromDate,
-            REPORT_PERIOD.toDate,
+            reportPeriod.fromDate,
+            reportPeriod.toDate,
             billCodes,
             returnCodes,
             allCodes,

@@ -1,4 +1,5 @@
 const outstandingQueries = require("../db/outstandingQueries");
+const { DEFAULT_FINANCIAL_YEAR } = require("../utils/financialYear");
 
 const SALES_CODE = "S";
 const SALES_RETURN_CODE = "SR";
@@ -220,11 +221,12 @@ function buildOutstandingReport(entries, allocations, options) {
   return { summary, data, partySummary };
 }
 
-async function getOutstandingReport(reportContext, options) {
-  const entries = await outstandingQueries.findBillEntries(reportContext, [
-    ...options.transactionCodes,
-    options.returnCode,
-  ]);
+async function getOutstandingReport(reportContext, options, financialYear) {
+  const entries = await outstandingQueries.findBillEntries(
+    reportContext,
+    [...options.transactionCodes, options.returnCode],
+    financialYear,
+  );
   const billNumbers = [
     ...new Set(
       entries
@@ -239,35 +241,50 @@ async function getOutstandingReport(reportContext, options) {
           reportContext,
           options.paymentCode,
           billNumbers,
+          financialYear,
         );
 
   return buildOutstandingReport(entries, allocations, options);
 }
 
-async function getSales(reportContext) {
-  return getOutstandingReport(reportContext, {
-    transactionCodes: [SALES_CODE],
-    returnCode: SALES_RETURN_CODE,
-    paymentCode: BANK_RECEIPT_CODE,
-    type: "sales",
-    outstandingField: "amountToCollect",
-    totalAmountField: "totalSalesAmount",
-    totalReturnField: "totalSalesReturnAmount",
-    totalOutstandingField: "totalToCollect",
-  });
+async function getSales(
+  reportContext,
+  { financialYear = DEFAULT_FINANCIAL_YEAR } = {},
+) {
+  return getOutstandingReport(
+    reportContext,
+    {
+      transactionCodes: [SALES_CODE],
+      returnCode: SALES_RETURN_CODE,
+      paymentCode: BANK_RECEIPT_CODE,
+      type: "sales",
+      outstandingField: "amountToCollect",
+      totalAmountField: "totalSalesAmount",
+      totalReturnField: "totalSalesReturnAmount",
+      totalOutstandingField: "totalToCollect",
+    },
+    financialYear,
+  );
 }
 
-async function getPurchases(reportContext) {
-  return getOutstandingReport(reportContext, {
-    transactionCodes: PURCHASE_CODES,
-    returnCode: PURCHASE_RETURN_CODE,
-    paymentCode: BANK_PAYMENT_CODE,
-    type: "purchases",
-    outstandingField: "amountToPay",
-    totalAmountField: "totalPurchaseAmount",
-    totalReturnField: "totalPurchaseReturnAmount",
-    totalOutstandingField: "totalToPay",
-  });
+async function getPurchases(
+  reportContext,
+  { financialYear = DEFAULT_FINANCIAL_YEAR } = {},
+) {
+  return getOutstandingReport(
+    reportContext,
+    {
+      transactionCodes: PURCHASE_CODES,
+      returnCode: PURCHASE_RETURN_CODE,
+      paymentCode: BANK_PAYMENT_CODE,
+      type: "purchases",
+      outstandingField: "amountToPay",
+      totalAmountField: "totalPurchaseAmount",
+      totalReturnField: "totalPurchaseReturnAmount",
+      totalOutstandingField: "totalToPay",
+    },
+    financialYear,
+  );
 }
 
 module.exports = { getSales, getPurchases };

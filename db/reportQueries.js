@@ -4,10 +4,13 @@ const {
   createCompanyWhere,
   createCompanySql,
 } = require("./reportScope");
+const { financialYearFromPeriod } = require("../utils/financialYear");
 
 function createEntryDateFilter(reportContext, codes, fromDate, toDate) {
   return {
     ...createCompanyWhere(reportContext),
+    financialYear: financialYearFromPeriod(fromDate, toDate),
+    isOpening: false,
     code: { in: codes },
     billDate: {
       gte: new Date(fromDate),
@@ -194,6 +197,7 @@ async function findMonthlyReportRows(
   returnCodes,
 ) {
   const companySql = createCompanySql(reportContext, Prisma);
+  const financialYear = financialYearFromPeriod(fromDate, toDate);
   const billCodeSql = Prisma.join(billCodes);
   const returnCodeSql = Prisma.join(returnCodes);
   const allCodesSql = Prisma.join([...billCodes, ...returnCodes]);
@@ -211,6 +215,8 @@ async function findMonthlyReportRows(
       ) AS return_amount
     FROM "BillEntry"
     WHERE ${companySql}
+      AND "financialYear" = ${financialYear}
+      AND "isOpening" = false
       AND code IN (${allCodesSql})
       AND "billDate" >= ${fromDate}
       AND "billDate" < ${toDate}
@@ -229,6 +235,7 @@ async function findPartySummaryRows(
   party,
 ) {
   const companySql = createCompanySql(reportContext, Prisma);
+  const financialYear = financialYearFromPeriod(fromDate, toDate);
   const billCodeSql = Prisma.join(billCodes);
   const returnCodeSql = Prisma.join(returnCodes);
   const allCodesSql = Prisma.join(allCodes);
@@ -259,6 +266,8 @@ async function findPartySummaryRows(
       COUNT(*) FILTER (WHERE code IN (${allCodesSql})) AS invoice_count
     FROM "BillEntry"
     WHERE ${companySql}
+      AND "financialYear" = ${financialYear}
+      AND "isOpening" = false
       AND code IN (${allCodesSql})
       AND "billDate" >= ${fromDate}
       AND "billDate" < ${toDate}

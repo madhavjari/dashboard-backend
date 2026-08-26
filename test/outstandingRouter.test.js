@@ -35,7 +35,10 @@ describe("GET /api/v1/reports/outstanding/sales", () => {
     expect(res.body).toEqual(report);
     expect(outstandingService.getSales).toHaveBeenCalledWith(
       { mode: "demo", companyId: DEMO_TENANT.companyId },
-      { party: "ACME TEXTILES" },
+      {
+        party: "ACME TEXTILES",
+        financialYear: "2025-2026",
+      },
     );
   });
 });
@@ -60,7 +63,7 @@ describe("GET /api/v1/reports/outstanding/purchases", () => {
     expect(res.body).toEqual(report);
     expect(outstandingService.getPurchases).toHaveBeenCalledWith(
       { mode: "demo", companyId: DEMO_TENANT.companyId },
-      {},
+      { financialYear: "2025-2026" },
     );
   });
 });

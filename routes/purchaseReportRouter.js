@@ -6,11 +6,16 @@ const { validate } = require("../middleware/zodValidator");
 const {
   partyDetailsSchema,
   itemDetailsSchema,
+  reportPeriodSchema,
 } = require("../schema/validatorSchema");
 
 const purchaseReportRouter = Router();
 
-purchaseReportRouter.use("/api/v1/reports/purchases", resolveReportAccess);
+purchaseReportRouter.use(
+  "/api/v1/reports/purchases",
+  resolveReportAccess,
+  validate(reportPeriodSchema),
+);
 
 purchaseReportRouter.get(
   "/api/v1/reports/purchases/KPI-summary",

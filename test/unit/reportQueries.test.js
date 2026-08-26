@@ -42,6 +42,8 @@ describe("reportQueries tenant isolation", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           companyId: { in: ["company_1", "company_2"] },
+          financialYear: "2025-2026",
+          isOpening: false,
           code: { in: ["S"] },
         }),
       }),
@@ -51,6 +53,8 @@ describe("reportQueries tenant isolation", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           companyId: { in: ["company_1", "company_2"] },
+          financialYear: "2025-2026",
+          isOpening: false,
           code: { in: ["SR"] },
         }),
       }),

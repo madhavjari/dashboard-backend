@@ -1,19 +1,16 @@
 const { getIndividualItemDetails } = require("../services/reportService.js");
-
-const REPORT_PERIOD = {
-  fromDate: "2025-04-01",
-  toDate: "2026-04-01",
-};
+const { getFinancialYearPeriod } = require("../utils/financialYear");
 
 function createItemDetailsHandler(billCodes, returnCodes) {
   return async function getItemDetails(req, res) {
     const { item: itemName } = req.query;
 
     try {
+      const reportPeriod = getFinancialYearPeriod(req.query?.financialYear);
       const report = await getIndividualItemDetails(
         req.reportContext,
-        REPORT_PERIOD.fromDate,
-        REPORT_PERIOD.toDate,
+        reportPeriod.fromDate,
+        reportPeriod.toDate,
         itemName,
         billCodes,
         returnCodes,
