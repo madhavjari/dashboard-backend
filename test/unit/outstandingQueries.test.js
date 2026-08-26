@@ -20,7 +20,11 @@ describe("outstanding financial-year queries", () => {
 
   test("keeps opening bills in the selected financial year", async () => {
     await findBillEntries(
-      { mode: "authenticated", companyIds: ["company-1"] },
+      {
+        mode: "authenticated",
+        companyIds: ["company-1"],
+        accountingCompanyIds: ["books-1", "books-2"],
+      },
       ["S", "SR"],
       "2026-2027",
     );
@@ -29,6 +33,7 @@ describe("outstanding financial-year queries", () => {
       expect.objectContaining({
         where: {
           companyId: "company-1",
+          accountingCompanyId: { in: ["books-1", "books-2"] },
           financialYear: "2026-2027",
           code: { in: ["S", "SR"] },
         },
@@ -41,7 +46,11 @@ describe("outstanding financial-year queries", () => {
 
   test("uses only allocations from the selected financial year", async () => {
     await findPaymentAllocations(
-      { mode: "authenticated", companyIds: ["company-1"] },
+      {
+        mode: "authenticated",
+        companyIds: ["company-1"],
+        accountingCompanyIds: ["books-1"],
+      },
       "BR",
       ["S-1"],
       "2026-2027",
@@ -50,7 +59,10 @@ describe("outstanding financial-year queries", () => {
     expect(prisma.paymentAllocation.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          paymentVoucher: { financialYear: "2026-2027" },
+          paymentVoucher: {
+            financialYear: "2026-2027",
+            accountingCompanyId: "books-1",
+          },
         }),
       }),
     );

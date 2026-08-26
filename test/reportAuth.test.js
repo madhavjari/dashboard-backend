@@ -149,6 +149,24 @@ beforeEach(() => {
 });
 
 describe("report route access", () => {
+  test("passes a deduplicated accounting-company selection into report scope", async () => {
+    const firstId = "00000000-0000-4000-8000-000000000201";
+    const secondId = "00000000-0000-4000-8000-000000000202";
+    const response = await request(app)
+      .get("/api/v1/reports/sales/KPI-summary")
+      .query({ accountingCompanyIds: `${firstId},${secondId},${firstId}` })
+      .set("Authorization", `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    const controllerRequest = salesReportController.getKPISummary.mock.calls[0][0];
+    expect(controllerRequest.reportContext).toEqual({
+      mode: "authenticated",
+      userId: "user_1",
+      companyIds: ["company_1"],
+      accountingCompanyIds: [firstId, secondId],
+    });
+  });
+
   test.each(protectedRoutes)(
     "GET %s uses the demo context for anonymous requests",
     async (url, controller) => {

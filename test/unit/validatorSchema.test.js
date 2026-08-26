@@ -6,6 +6,7 @@ const {
   passwordResetSchema,
   partyDetailsSchema,
   itemDetailsSchema,
+  reportPeriodSchema,
 } = require("../../schema/validatorSchema");
 const { findUser } = require("../../db/authQueries");
 
@@ -499,6 +500,33 @@ describe("itemDetailsSchema", () => {
   test("rejects an item longer than the database column", async () => {
     const result = await itemDetailsSchema.safeParseAsync({
       query: { item: "A".repeat(256) },
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("reportPeriodSchema", () => {
+  test("normalizes a comma-separated accounting-company selection", async () => {
+    const firstId = "00000000-0000-4000-8000-000000000201";
+    const secondId = "00000000-0000-4000-8000-000000000202";
+    const result = await reportPeriodSchema.safeParseAsync({
+      query: {
+        financialYear: "2026-2027",
+        accountingCompanyIds: `${firstId},${secondId}`,
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data.query.accountingCompanyIds).toEqual([
+      firstId,
+      secondId,
+    ]);
+  });
+
+  test("rejects invalid accounting-company IDs", async () => {
+    const result = await reportPeriodSchema.safeParseAsync({
+      query: { accountingCompanyIds: "not-a-company-id" },
     });
 
     expect(result.success).toBe(false);

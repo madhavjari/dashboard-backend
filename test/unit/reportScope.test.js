@@ -1,4 +1,5 @@
 const {
+  createAccountingCompanyWhere,
   getReportCompanyIds,
   createCompanyWhere,
 } = require("../../db/reportScope");
@@ -30,5 +31,27 @@ describe("reportScope", () => {
     expect(createCompanyWhere(undefined)).toEqual({
       companyId: { in: [] },
     });
+  });
+
+  it("adds the selected accounting companies without changing tenant scope", () => {
+    const context = {
+      mode: "authenticated",
+      companyIds: ["account_1"],
+      accountingCompanyIds: ["books_1", "books_2", "books_1"],
+    };
+
+    expect(createCompanyWhere(context)).toEqual({ companyId: "account_1" });
+    expect(createAccountingCompanyWhere(context)).toEqual({
+      accountingCompanyId: { in: ["books_1", "books_2"] },
+    });
+  });
+
+  it("does not restrict accounting companies when no selection is supplied", () => {
+    expect(
+      createAccountingCompanyWhere({
+        mode: "authenticated",
+        companyIds: ["account_1"],
+      }),
+    ).toEqual({});
   });
 });

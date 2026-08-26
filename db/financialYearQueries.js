@@ -1,5 +1,8 @@
 const { prisma } = require("../lib/prisma");
-const { createCompanyWhere } = require("./reportScope");
+const {
+  createAccountingCompanyWhere,
+  createCompanyWhere,
+} = require("./reportScope");
 
 function sortFinancialYears(financialYears) {
   return [...financialYears].sort((left, right) => {
@@ -11,14 +14,15 @@ function sortFinancialYears(financialYears) {
 
 async function findAvailableFinancialYears(reportContext) {
   const companyWhere = createCompanyWhere(reportContext);
+  const accountingCompanyWhere = createAccountingCompanyWhere(reportContext);
   const [billYears, voucherYears] = await Promise.all([
     prisma.billEntry.findMany({
-      where: companyWhere,
+      where: { ...companyWhere, ...accountingCompanyWhere },
       distinct: ["financialYear"],
       select: { financialYear: true },
     }),
     prisma.paymentVoucher.findMany({
-      where: companyWhere,
+      where: { ...companyWhere, ...accountingCompanyWhere },
       distinct: ["financialYear"],
       select: { financialYear: true },
     }),
@@ -31,4 +35,19 @@ async function findAvailableFinancialYears(reportContext) {
   return sortFinancialYears(financialYears);
 }
 
-module.exports = { findAvailableFinancialYears };
+async function findAvailableAccountingCompanies(reportContext) {
+  return prisma.accountingCompany.findMany({
+    where: createCompanyWhere(reportContext),
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      company: { select: { name: true } },
+    },
+  });
+}
+
+module.exports = {
+  findAvailableAccountingCompanies,
+  findAvailableFinancialYears,
+};

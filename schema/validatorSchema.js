@@ -221,10 +221,26 @@ const financialYearSchema = z
   }, "Financial year must contain consecutive years")
   .default("2025-2026");
 
+const accountingCompanyIdsSchema = z.preprocess(
+  (value) => {
+    if (value === undefined) return undefined;
+    const values = Array.isArray(value) ? value : [value];
+    return values
+      .flatMap((entry) => String(entry || "").split(","))
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  },
+  z
+    .array(z.uuid("Accounting company ID must be a valid UUID"))
+    .max(100, "A maximum of 100 accounting companies can be selected")
+    .optional(),
+);
+
 const reportPeriodSchema = z.object({
   query: z
     .object({
       financialYear: financialYearSchema,
+      accountingCompanyIds: accountingCompanyIdsSchema,
     })
     .passthrough(),
 });

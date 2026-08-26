@@ -1,6 +1,7 @@
 const { prisma } = require("../lib/prisma.js");
 const { Prisma } = require("../generated/prisma/client.js");
 const {
+  createAccountingCompanyWhere,
   createCompanyWhere,
   createCompanySql,
 } = require("./reportScope");
@@ -9,6 +10,7 @@ const { financialYearFromPeriod } = require("../utils/financialYear");
 function createEntryDateFilter(reportContext, codes, fromDate, toDate) {
   return {
     ...createCompanyWhere(reportContext),
+    ...createAccountingCompanyWhere(reportContext),
     financialYear: financialYearFromPeriod(fromDate, toDate),
     isOpening: false,
     code: { in: codes },
