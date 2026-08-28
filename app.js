@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { corsOptions } = require("./config/cors");
+const { generalIpLimiter } = require("./middleware/rateLimiter");
 
 const syncRouter = require("./routes/syncRouter");
 const authRouter = require("./routes/authRouter");
@@ -16,6 +17,12 @@ const financialYearRouter = require("./routes/financialYearRouter");
 const app = express();
 
 app.use(cors(corsOptions));
+
+// Keep Express's default direct-peer IP behavior here. Production deployments
+// must set an exact trusted proxy hop/subnet configuration for their topology;
+// never trust arbitrary forwarded headers just to make rate limiting work.
+app.use("/api", generalIpLimiter);
+
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(express.json({ limit: "50mb" }));
 

@@ -67,6 +67,7 @@ const salesReportRouter = require("../routes/salesReportRouter");
 const purchaseReportRouter = require("../routes/purchaseReportRouter");
 const outstandingRouter = require("../routes/outstandingRouter");
 const cashflowRouter = require("../routes/cashflowRouter");
+const { reportLimiter } = require("../middleware/rateLimiter");
 
 const app = express();
 app.use(salesReportRouter);
@@ -136,8 +137,12 @@ const protectedRoutes = [
   ["/api/v1/reports/cashflow", cashflowController.getCashflow],
 ];
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
+  await Promise.all([
+    reportLimiter.resetKey("user:user_1"),
+    reportLimiter.resetKey("ip:127.0.0.1"),
+  ]);
   findUser.mockResolvedValue({
     id: "user_1",
     email: "owner@example.com",
@@ -149,6 +154,22 @@ beforeEach(() => {
 });
 
 describe("report route access", () => {
+  test("allows a normal dashboard batch and limits excessive report requests", async () => {
+    for (let requestNumber = 0; requestNumber < 60; requestNumber += 1) {
+      const response = await request(app)
+        .get("/api/v1/reports/sales/KPI-summary")
+        .set("Authorization", `Bearer ${accessToken}`);
+      expect(response.status).toBe(200);
+    }
+
+    const exceeded = await request(app)
+      .get("/api/v1/reports/sales/KPI-summary")
+      .set("Authorization", `Bearer ${accessToken}`);
+
+    expect(exceeded.status).toBe(429);
+    expect(salesReportController.getKPISummary).toHaveBeenCalledTimes(60);
+  });
+
   test("passes a deduplicated accounting-company selection into report scope", async () => {
     const firstId = "00000000-0000-4000-8000-000000000201";
     const secondId = "00000000-0000-4000-8000-000000000202";

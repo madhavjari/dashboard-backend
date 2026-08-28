@@ -36,6 +36,7 @@ describe("application deployment configuration", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: "ok" });
+    expect(response.headers.ratelimit).toBeUndefined();
   });
 
   test("allows the configured frontend origin with credentials", async () => {

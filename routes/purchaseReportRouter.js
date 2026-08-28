@@ -2,6 +2,7 @@ const { Router } = require("express");
 const purchaseReportController = require("../controllers/purchaseReportController");
 const itemReportController = require("../controllers/itemReportController");
 const { resolveReportAccess } = require("../middleware/reportAccess");
+const { reportLimiter } = require("../middleware/rateLimiter");
 const { validate } = require("../middleware/zodValidator");
 const {
   partyDetailsSchema,
@@ -14,6 +15,7 @@ const purchaseReportRouter = Router();
 purchaseReportRouter.use(
   "/api/v1/reports/purchases",
   resolveReportAccess,
+  reportLimiter,
   validate(reportPeriodSchema),
 );
 

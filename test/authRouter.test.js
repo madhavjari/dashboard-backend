@@ -25,6 +25,12 @@ const {
   sendPasswordResetEmail,
 } = require("../services/email");
 const { hashString } = require("../utils/token");
+const {
+  emailKey,
+  loginEmailLimiter,
+  loginIpLimiter,
+  registerIpLimiter,
+} = require("../middleware/rateLimiter");
 
 const app = require("../app");
 const validRegisterBody = {
@@ -37,8 +43,9 @@ const validRegisterBody = {
   confirmPassword: "Str0ng!Pass",
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
+  await registerIpLimiter.resetKey("127.0.0.1");
   accountDb.getUserAccountAccess.mockResolvedValue({
     accounts: [],
   });
@@ -233,6 +240,25 @@ describe("POST /api/v1/auth/login", () => {
     expect(res.status).toBe(400);
     expect(res.body.errors).toHaveProperty("email");
     expect(res.body.errors).toHaveProperty("password");
+  });
+
+  it("eventually rate-limits repeated attempts without account-specific details", async () => {
+    await loginIpLimiter.resetKey("127.0.0.1");
+    await loginEmailLimiter.resetKey(
+      emailKey({ body: { email: creds.email }, ip: "127.0.0.1" }),
+    );
+    db.findUser.mockResolvedValue(null);
+
+    let response;
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      response = await request(app).post("/api/v1/auth/login").send(creds);
+    }
+
+    expect(response.status).toBe(429);
+    expect(response.body).toEqual({
+      message: "Too many requests. Please try again later.",
+      code: "RATE_LIMIT_EXCEEDED",
+    });
   });
 });
 
