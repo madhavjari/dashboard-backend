@@ -194,6 +194,7 @@ model BillEntry {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @default(now()) @updatedAt
   items               BillItem[]
+  returnAdjustments   BillReturnAdjustment[]
 
   @@unique([companyId, id])
   @@unique([companyId, syncSourceId, financialYear, compNo, entryId], map: "BillEntry_sync_financial_year_key")
@@ -202,6 +203,22 @@ model BillEntry {
   @@index([companyId, party])
   @@index([companyId, accountingCompanyId, billDate])
   @@index([companyId, financialYear, isOpening])
+}
+
+model BillReturnAdjustment {
+  id                BigInt    @id @default(autoincrement())
+  companyId         String
+  billEntryId       BigInt
+  billEntry         BillEntry @relation(fields: [companyId, billEntryId], references: [companyId, id], onDelete: Cascade)
+  sourceEntryId     String    @db.VarChar(100)
+  returnBillEntryId String    @db.VarChar(100)
+  adjustedAmount    Decimal   @db.Decimal(18, 2)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  @@unique([companyId, billEntryId, sourceEntryId])
+  @@index([companyId, billEntryId])
+  @@index([companyId, returnBillEntryId])
 }
 
 model BillItem {
