@@ -219,7 +219,7 @@ describe("outstandingService.getPurchases", () => {
     );
     expect(outstandingQueries.findBillEntries).toHaveBeenCalledWith(
       undefined,
-      ["P", "OP", "FJ", "PR"],
+      ["P", "OP", "FJ", "PR", "FJR"],
       "2025-2026",
     );
     expect(outstandingQueries.findPaymentAllocations).toHaveBeenCalledWith(
@@ -228,6 +228,38 @@ describe("outstandingService.getPurchases", () => {
       ["P-100"],
       "2025-2026",
     );
+  });
+
+  test("subtracts FJR returns from the affected supplier's amount to pay", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        code: "FJ",
+        bill_no: "FJ-100",
+        bill_date: new Date("2026-04-05"),
+        party: "JOB WORK SUPPLIER",
+        net_amount: "10000.00",
+      },
+      {
+        code: "FJR",
+        bill_no: "FJR-1",
+        bill_date: new Date("2026-04-06"),
+        party: "JOB WORK SUPPLIER",
+        net_amount: "7004.00",
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([]);
+
+    const report = await getPurchases();
+
+    expect(report.summary.totalPurchaseReturnAmount).toBe(7004);
+    expect(report.summary.totalToPay).toBe(2996);
+    expect(report.partySummary).toEqual([
+      expect.objectContaining({
+        party: "JOB WORK SUPPLIER",
+        totalPurchaseReturnAmount: 7004,
+        amountToPay: 2996,
+      }),
+    ]);
   });
 });
 

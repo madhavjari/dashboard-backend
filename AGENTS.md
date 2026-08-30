@@ -141,7 +141,7 @@ Current report logic uses these transaction codes:
 | Sale                                | `S`             |
 | Sales return                        | `SR`            |
 | Purchase                            | `P`, `OP`, `FJ` |
-| Purchase return                     | `PR`            |
+| Purchase return                     | `PR`, `FJR`     |
 | Bank receipt used against sales     | `BR`            |
 | Bank payment used against purchases | `BP`            |
 

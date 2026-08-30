@@ -2,10 +2,10 @@ const outstandingQueries = require("../db/outstandingQueries");
 const { DEFAULT_FINANCIAL_YEAR } = require("../utils/financialYear");
 
 const SALES_CODE = "S";
-const SALES_RETURN_CODE = "SR";
+const SALES_RETURN_CODES = ["SR"];
 const BANK_RECEIPT_CODE = "BR";
 const PURCHASE_CODES = ["P", "OP", "FJ"];
-const PURCHASE_RETURN_CODE = "PR";
+const PURCHASE_RETURN_CODES = ["PR", "FJR"];
 const BANK_PAYMENT_CODE = "BP";
 
 function toNumber(value) {
@@ -108,7 +108,7 @@ function createPartySummary(party, type) {
 function buildOutstandingReport(entries, allocations, options) {
   const {
     transactionCodes,
-    returnCode,
+    returnCodes,
     type,
     outstandingField,
     totalAmountField,
@@ -119,7 +119,7 @@ function buildOutstandingReport(entries, allocations, options) {
   const returnsByParty = new Map();
 
   for (const entry of entries) {
-    if (entry.code === returnCode) {
+    if (returnCodes.includes(entry.code)) {
       returnsByParty.set(
         entry.party,
         (returnsByParty.get(entry.party) || 0) + toNumber(entry.net_amount),
@@ -224,13 +224,16 @@ function buildOutstandingReport(entries, allocations, options) {
 async function getOutstandingReport(reportContext, options, financialYear) {
   const entries = await outstandingQueries.findBillEntries(
     reportContext,
-    [...options.transactionCodes, options.returnCode],
+    [...options.transactionCodes, ...options.returnCodes],
     financialYear,
   );
   const billNumbers = [
     ...new Set(
       entries
-        .filter((entry) => entry.code !== options.returnCode && entry.bill_no)
+        .filter(
+          (entry) =>
+            !options.returnCodes.includes(entry.code) && entry.bill_no,
+        )
         .map((entry) => entry.bill_no),
     ),
   ];
@@ -255,7 +258,7 @@ async function getSales(
     reportContext,
     {
       transactionCodes: [SALES_CODE],
-      returnCode: SALES_RETURN_CODE,
+      returnCodes: SALES_RETURN_CODES,
       paymentCode: BANK_RECEIPT_CODE,
       type: "sales",
       outstandingField: "amountToCollect",
@@ -275,7 +278,7 @@ async function getPurchases(
     reportContext,
     {
       transactionCodes: PURCHASE_CODES,
-      returnCode: PURCHASE_RETURN_CODE,
+      returnCodes: PURCHASE_RETURN_CODES,
       paymentCode: BANK_PAYMENT_CODE,
       type: "purchases",
       outstandingField: "amountToPay",
