@@ -44,6 +44,45 @@ describe("outstanding financial-year queries", () => {
     ).not.toHaveProperty("isOpening");
   });
 
+  test("returns distinct item names for each invoice", async () => {
+    prisma.billEntry.findMany.mockResolvedValue([
+      {
+        accountingCompanyId: "books-1",
+        code: "S",
+        billNo: "S-1",
+        billDate: new Date("2026-04-01"),
+        party: "ACME",
+        netAmount: "1200.00",
+        items: [
+          { itemName: "COTTON" },
+          { itemName: "COTTON" },
+          { itemName: "LINEN" },
+          { itemName: null },
+        ],
+      },
+    ]);
+
+    await expect(
+      findBillEntries(
+        { mode: "authenticated", companyIds: ["company-1"] },
+        ["S"],
+        "2026-2027",
+      ),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        bill_no: "S-1",
+        item_names: ["COTTON", "LINEN"],
+      }),
+    ]);
+    expect(prisma.billEntry.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          items: { select: { itemName: true } },
+        }),
+      }),
+    );
+  });
+
   test("uses only allocations from the selected financial year", async () => {
     await findPaymentAllocations(
       {

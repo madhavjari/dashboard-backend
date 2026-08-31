@@ -19,6 +19,11 @@ async function findBillEntries(reportContext, codes, financialYear) {
       billDate: true,
       party: true,
       netAmount: true,
+      items: {
+        select: {
+          itemName: true,
+        },
+      },
     },
     orderBy: { billDate: "desc" },
   });
@@ -30,6 +35,9 @@ async function findBillEntries(reportContext, codes, financialYear) {
     bill_date: row.billDate,
     party: row.party,
     net_amount: row.netAmount,
+    item_names: [
+      ...new Set(row.items.map((item) => item.itemName).filter(Boolean)),
+    ],
   }));
 }
 

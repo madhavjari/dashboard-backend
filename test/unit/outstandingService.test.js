@@ -18,6 +18,7 @@ describe("outstandingService.getSales", () => {
         bill_date: new Date("2026-04-05"),
         party: "ACME TEXTILES",
         net_amount: "1000.00",
+        item_names: ["COTTON", "LINEN"],
       },
       {
         bill_no: "S-101",
@@ -61,6 +62,7 @@ describe("outstandingService.getSales", () => {
     expect(report.data[0]).toEqual(
       expect.objectContaining({
         billNo: "S-100",
+        itemNames: ["COTTON", "LINEN"],
         billAmount: 1000,
         adjustedAmount: 600,
         amountToCollect: 400,

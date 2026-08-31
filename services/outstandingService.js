@@ -49,6 +49,7 @@ function createOutstandingEntry(entry, outstandingField) {
     billNo: entry.bill_no,
     billDate: entry.bill_date,
     party: entry.party,
+    itemNames: entry.item_names ?? [],
     billAmount: toNumber(entry.net_amount),
     adjustedAmount: 0,
     unadjustedAmount: 0,
@@ -140,6 +141,9 @@ function buildOutstandingReport(entries, allocations, options) {
     const existingEntry = entriesByBillAndParty.get(key);
     if (existingEntry) {
       existingEntry.billAmount += toNumber(entry.net_amount);
+      existingEntry.itemNames = [
+        ...new Set([...existingEntry.itemNames, ...(entry.item_names ?? [])]),
+      ];
       existingEntry[outstandingField] =
         existingEntry.billAmount - existingEntry.adjustedAmount;
       continue;
