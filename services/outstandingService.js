@@ -3,10 +3,10 @@ const { DEFAULT_FINANCIAL_YEAR } = require("../utils/financialYear");
 
 const SALES_CODE = "S";
 const SALES_RETURN_CODES = ["SR"];
-const BANK_RECEIPT_CODE = "BR";
+const BANK_RECEIPT_CODE = ["BR", "CR"];
 const PURCHASE_CODES = ["P", "OP", "FJ"];
 const PURCHASE_RETURN_CODES = ["PR", "FJR"];
-const BANK_PAYMENT_CODE = "BP";
+const BANK_PAYMENT_CODE = ["BP", "CP"];
 
 function toNumber(value) {
   return Number(value) || 0;
@@ -235,8 +235,7 @@ async function getOutstandingReport(reportContext, options, financialYear) {
     ...new Set(
       entries
         .filter(
-          (entry) =>
-            !options.returnCodes.includes(entry.code) && entry.bill_no,
+          (entry) => !options.returnCodes.includes(entry.code) && entry.bill_no,
         )
         .map((entry) => entry.bill_no),
     ),

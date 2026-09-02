@@ -43,14 +43,14 @@ async function findBillEntries(reportContext, codes, financialYear) {
 
 async function findPaymentAllocations(
   reportContext,
-  code,
+  codes,
   billNumbers,
   financialYear,
 ) {
   const rows = await prisma.paymentAllocation.findMany({
     where: {
       ...createCompanyWhere(reportContext),
-      code,
+      code: { in: codes },
       billNo: { in: billNumbers },
       paymentVoucher: {
         financialYear,
