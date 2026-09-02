@@ -310,6 +310,7 @@ model PaymentAllocation {
   entryId          String?        @db.VarChar(100)
   code             String?        @db.VarChar(100)
   billNo           String?        @db.VarChar(100)
+  billEntrySourceId String?       @db.VarChar(100)
   allocationDate   DateTime?      @db.Date
   mode             String?        @db.VarChar(100)
   billAmount       Decimal?       @db.Decimal(18, 2)
@@ -323,4 +324,5 @@ model PaymentAllocation {
   @@unique([companyId, paymentVoucherId, entryId])
   @@index([companyId, paymentVoucherId])
   @@index([companyId, billNo])
+  @@index([companyId, billEntrySourceId])
 }
