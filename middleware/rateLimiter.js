@@ -84,7 +84,9 @@ function userKey(req) {
 }
 
 function normalizeEmail(req) {
-  return String(req.body?.email || "").trim().toLowerCase();
+  return String(req.body?.email || "")
+    .trim()
+    .toLowerCase();
 }
 
 function emailKey(req) {
@@ -93,7 +95,6 @@ function emailKey(req) {
     return ipKey(req);
   }
 
-  // Hashing avoids retaining email addresses in this store or a future shared one.
   const digest = crypto.createHash("sha256").update(email).digest("hex");
   return `email:${digest}`;
 }
@@ -109,9 +110,6 @@ function createRateLimiter(policy, overrides = {}) {
   });
 }
 
-// The maintained MemoryStore periodically discards expired entries and resets on
-// process restart. Before using multiple Node processes or replicas, supply a new
-// shared store here (for example Redis) so every instance sees the same counters.
 const generalIpLimiter = createRateLimiter(RATE_LIMITS.GENERAL_IP);
 const authenticatedUserLimiter = createRateLimiter(
   RATE_LIMITS.AUTHENTICATED_USER,
