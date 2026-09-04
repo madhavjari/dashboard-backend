@@ -17,10 +17,6 @@ async function createCompanyAndUser(user) {
       },
       select: {
         id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phoneNumber: true,
       },
     });
 

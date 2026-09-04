@@ -19,6 +19,8 @@ syncRouter.post(
   syncController.postAccountingCompanies,
 );
 
+//use of resolved company by creating Set() of companies
+// and Map()(key value pair) of companies and its externalid
 syncRouter.post(
   "/api/v1/sync/bills",
   syncApiKeyAuth,

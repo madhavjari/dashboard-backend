@@ -94,13 +94,11 @@ async function postLogin(req, res) {
       expiresAt: refreshExpiry(),
       family: crypto.randomUUID(),
     });
-    res
-      .cookie("refresh_token", refreshToken, refreshCookieOptions)
-      .json({
-        accessToken,
-        isVerified: user.emailVerified,
-        accounts: accountAccess?.accounts ?? [],
-      });
+    res.cookie("refresh_token", refreshToken, refreshCookieOptions).json({
+      accessToken,
+      isVerified: user.emailVerified,
+      accounts: accountAccess?.accounts ?? [],
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({
