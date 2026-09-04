@@ -2,6 +2,9 @@ const { prisma } = require("../lib/prisma");
 
 const SYNC_SOURCE_MANAGERS = new Set(["OWNER", "ADMIN"]);
 
+//checks companies current status. if the current time is
+// greater than the status time in the database,
+// it changes the status
 function resolveSubscription(company, now) {
   if (company.subscriptionStatus === "TRIAL") {
     const trialIsActive =
@@ -47,9 +50,7 @@ function mapAccount(membership, now) {
     lastSyncedAt: source.lastSyncedAt,
     hasActiveApiKey: source.apiKeys.length > 0,
   }));
-  const hasActiveApiKey = syncSources.some(
-    (source) => source.hasActiveApiKey,
-  );
+  const hasActiveApiKey = syncSources.some((source) => source.hasActiveApiKey);
   const accountingCompanies = company.syncSources.flatMap((source) =>
     source.accountingCompanies.map((accountingCompany) => ({
       ...accountingCompany,
@@ -75,8 +76,7 @@ function mapAccount(membership, now) {
     },
     accountingCompanies,
     access: {
-      canViewLiveData:
-        hasActiveApiKey && subscriptionAccess.canViewLiveData,
+      canViewLiveData: hasActiveApiKey && subscriptionAccess.canViewLiveData,
       reason: hasActiveApiKey
         ? subscriptionAccess.reason
         : "SYNC_SETUP_REQUIRED",
@@ -148,9 +148,7 @@ async function getUserAccountAccess(userId, now = new Date()) {
       email: user.email,
       isVerified: user.emailVerified,
     },
-    accounts: user.companies.map((membership) =>
-      mapAccount(membership, now),
-    ),
+    accounts: user.companies.map((membership) => mapAccount(membership, now)),
   };
 }
 
@@ -158,4 +156,3 @@ module.exports = {
   getUserAccountAccess,
   resolveSubscription,
 };
-

@@ -6,8 +6,7 @@ async function verifyToken(req, res, next) {
   if (!bearerHeader || !bearerHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Required: Sign in" });
   }
-  const bearer = bearerHeader.split(" ");
-  const bearerToken = bearer[1];
+  const bearerToken = bearerHeader.slice(7).trim();
   try {
     const payload = jwt.verify(bearerToken, process.env.JWT_SECRET_KEY, {
       algorithms: ["HS256"],
@@ -24,10 +23,7 @@ async function verifyToken(req, res, next) {
     req.user = user;
     next();
   } catch (err) {
-    if (
-      err instanceof jwt.JsonWebTokenError ||
-      err instanceof jwt.TokenExpiredError
-    ) {
+    if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid Credentials" });
     }
     console.error(err);
