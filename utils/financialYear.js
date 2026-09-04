@@ -1,3 +1,12 @@
+const getCurrentFinancialYear = () => {
+  const year = new Date().getFullYear();
+  const month = new Date().getMonth() + 1;
+
+  const fromYear = month >= 4 ? year : year - 1;
+
+  return `${fromYear}-${fromYear + 1}`;
+};
+
 const DEFAULT_FINANCIAL_YEAR = getCurrentFinancialYear();
 
 function getFinancialYearPeriod(financialYear = DEFAULT_FINANCIAL_YEAR) {
@@ -12,15 +21,6 @@ function getFinancialYearPeriod(financialYear = DEFAULT_FINANCIAL_YEAR) {
 function financialYearFromPeriod(fromDate, toDate) {
   return `${new Date(fromDate).getUTCFullYear()}-${new Date(toDate).getUTCFullYear()}`;
 }
-
-const getCurrentFinancialYear = () => {
-  const year = new Date().getFullYear();
-  const month = new Date().getMonth() + 1;
-
-  const fromYear = month >= 4 ? year : year - 1;
-
-  return `${fromYear}-${fromYear + 1}`;
-};
 
 module.exports = {
   DEFAULT_FINANCIAL_YEAR,

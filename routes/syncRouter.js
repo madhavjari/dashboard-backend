@@ -1,6 +1,6 @@
 const { Router } = require("express");
 const syncController = require("../controllers/syncController");
-const { syncApiKeyAuth } = require("../middleware/apiKeyAuth");
+const syncApiKeyAuth = require("../middleware/apiKeyAuth");
 const { validate } = require("../middleware/zodValidator");
 const {
   syncBillsSchema,
