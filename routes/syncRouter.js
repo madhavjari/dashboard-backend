@@ -10,6 +10,8 @@ const {
 
 const syncRouter = Router();
 
+//for creating new companies for same user.
+//checks apikey, insert or update new company name details, updates last sync
 syncRouter.post(
   "/api/v1/sync/companies",
   syncApiKeyAuth,

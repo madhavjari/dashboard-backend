@@ -2,9 +2,11 @@ const { authenticateSyncApiKey } = require("../db/syncSourceQueries");
 const { hashString } = require("../utils/token");
 
 function getPresentedApiKey(req) {
-  const authorization = req.get("authorization");
-  const bearerMatch = authorization?.match(/^Bearer\s+(.+)$/i);
-  if (bearerMatch) return bearerMatch[1].trim();
+  const auth = req.get("authorization");
+  //can also use match() instead of startWith.
+  if (auth?.startsWith("Bearer ")) {
+    return auth.slice(7).trim();
+  }
 
   return req.get("x-api-key")?.trim() || null;
 }
@@ -35,8 +37,4 @@ async function syncApiKeyAuth(req, res, next) {
   }
 }
 
-module.exports = {
-  syncApiKeyAuth,
-  // Keep the old export name temporarily for callers that have not migrated.
-  apiKeyAuth: syncApiKeyAuth,
-};
+module.exports = syncApiKeyAuth;

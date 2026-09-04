@@ -143,7 +143,10 @@ const syncCompaniesSchema = z.object({
                 .string()
                 .trim()
                 .min(1, "External company ID is required")
-                .max(200, "External company ID must be 200 characters or fewer"),
+                .max(
+                  200,
+                  "External company ID must be 200 characters or fewer",
+                ),
               name: z
                 .string()
                 .trim()
@@ -155,6 +158,8 @@ const syncCompaniesSchema = z.object({
         .min(1, "At least one accounting company is required")
         .max(100, "A maximum of 100 accounting companies is allowed"),
     })
+    //checking for duplicate external id,
+    // since external id is unique.
     .superRefine(({ companies }, context) => {
       const seen = new Set();
       companies.forEach((company, index) => {
@@ -193,10 +198,7 @@ const decimalSchema = z.union([
   z
     .string()
     .trim()
-    .regex(
-      /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/,
-      "Value must be a valid number",
-    ),
+    .regex(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/, "Value must be a valid number"),
 ]);
 
 const nullableDecimalSchema = z.preprocess(
@@ -308,7 +310,9 @@ const billSchema = z
 
 const paymentAllocationSchema = z
   .object({
-    entryId: externalRecordIdSchema("Allocation entry ID").nullable().optional(),
+    entryId: externalRecordIdSchema("Allocation entry ID")
+      .nullable()
+      .optional(),
     code: nullableTextSchema(100),
     billNo: nullableTextSchema(100),
     date: nullableDateSchema,
