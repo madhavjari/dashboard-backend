@@ -1,6 +1,7 @@
 const { z } = require("zod");
 
 const { findUser } = require("../db/authQueries");
+const { getCurrentFinancialYear } = require("../utils/financialYear");
 
 const passwordSchema = z
   .string()
@@ -186,13 +187,6 @@ const externalRecordIdSchema = (label) =>
         .max(100, `${label} must be 100 characters or fewer`),
     );
 
-const nullableTextSchema = (maximum) =>
-  z.preprocess(
-    (value) =>
-      value === undefined || value === null || value === "" ? null : value,
-    z.string().trim().max(maximum).nullable(),
-  );
-
 const decimalSchema = z.union([
   z.number().finite(),
   z
@@ -200,6 +194,15 @@ const decimalSchema = z.union([
     .trim()
     .regex(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/, "Value must be a valid number"),
 ]);
+
+//all nullable schemas checks if its undefined or blank,
+//it converts into null value and then pass on the validation.
+const nullableTextSchema = (maximum) =>
+  z.preprocess(
+    (value) =>
+      value === undefined || value === null || value === "" ? null : value,
+    z.string().trim().max(maximum).nullable(),
+  );
 
 const nullableDecimalSchema = z.preprocess(
   (value) =>
@@ -221,7 +224,7 @@ const financialYearSchema = z
     const [fromYear, toYear] = value.split("-").map(Number);
     return toYear === fromYear + 1;
   }, "Financial year must contain consecutive years")
-  .default("2025-2026");
+  .default(getCurrentFinancialYear);
 
 const accountingCompanyIdsSchema = z.preprocess(
   (value) => {
