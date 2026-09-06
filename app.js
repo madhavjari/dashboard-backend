@@ -24,6 +24,7 @@ app.use(
     maxAge: 86400,
   }),
 );
+app.set("trust proxy", 1);
 
 app.use("/api", generalIpLimiter);
 
