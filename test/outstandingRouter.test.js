@@ -11,6 +11,7 @@ jest.mock("../services/outstandingService", () => ({
 const outstandingService = require("../services/outstandingService");
 const outstandingRouter = require("../routes/outstandingRouter");
 const { DEMO_TENANT } = require("../config/demoTenant");
+const { DEFAULT_FINANCIAL_YEAR } = require("../utils/financialYear");
 
 const app = express();
 app.use(outstandingRouter);
@@ -37,7 +38,7 @@ describe("GET /api/v1/reports/outstanding/sales", () => {
       { mode: "demo", companyId: DEMO_TENANT.companyId },
       {
         party: "ACME TEXTILES",
-        financialYear: "2025-2026",
+        financialYear: DEFAULT_FINANCIAL_YEAR,
       },
     );
   });
@@ -63,7 +64,7 @@ describe("GET /api/v1/reports/outstanding/purchases", () => {
     expect(res.body).toEqual(report);
     expect(outstandingService.getPurchases).toHaveBeenCalledWith(
       { mode: "demo", companyId: DEMO_TENANT.companyId },
-      { financialYear: "2025-2026" },
+      { financialYear: DEFAULT_FINANCIAL_YEAR },
     );
   });
 });

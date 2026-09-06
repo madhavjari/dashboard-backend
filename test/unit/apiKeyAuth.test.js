@@ -1,5 +1,5 @@
 const { hashString } = require("../../utils/token");
-const { syncApiKeyAuth } = require("../../middleware/apiKeyAuth");
+const syncApiKeyAuth = require("../../middleware/apiKeyAuth");
 const { authenticateSyncApiKey } = require("../../db/syncSourceQueries");
 
 jest.mock("../../utils/token", () => ({

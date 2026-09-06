@@ -5,6 +5,7 @@ jest.mock("../../db/outstandingQueries", () => ({
 
 const outstandingQueries = require("../../db/outstandingQueries");
 const { getSales, getPurchases } = require("../../services/outstandingService.js");
+const { DEFAULT_FINANCIAL_YEAR } = require("../../utils/financialYear");
 
 describe("outstandingService.getSales", () => {
   beforeEach(() => {
@@ -78,9 +79,9 @@ describe("outstandingService.getSales", () => {
     );
     expect(outstandingQueries.findPaymentAllocations).toHaveBeenCalledWith(
       undefined,
-      "BR",
+      ["BR", "CR"],
       ["S-100", "S-101"],
-      "2025-2026",
+      DEFAULT_FINANCIAL_YEAR,
     );
   });
 
@@ -222,13 +223,13 @@ describe("outstandingService.getPurchases", () => {
     expect(outstandingQueries.findBillEntries).toHaveBeenCalledWith(
       undefined,
       ["P", "OP", "FJ", "PR", "FJR"],
-      "2025-2026",
+      DEFAULT_FINANCIAL_YEAR,
     );
     expect(outstandingQueries.findPaymentAllocations).toHaveBeenCalledWith(
       undefined,
-      "BP",
+      ["BP", "CP"],
       ["P-100"],
-      "2025-2026",
+      DEFAULT_FINANCIAL_YEAR,
     );
   });
 
