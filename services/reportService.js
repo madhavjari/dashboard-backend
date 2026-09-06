@@ -15,35 +15,43 @@ function mapItemSummary(item) {
   };
 }
 
-function isWeightAlias(per) {
+function getUnitKey(per) {
   const normalized = String(per ?? "").trim().toUpperCase();
-  return normalized === "W" || normalized === "N";
+  if (normalized === "W" || normalized === "N") return "weight";
+  if (normalized === "M" || normalized === "MTR") return "metre";
+  if (normalized === "P" || normalized === "PCS") return "pieces";
+  return normalized || null;
 }
 
-function mergeWeightAliasItems(items) {
+function mergeItemSummaryItems(items) {
   const merged = [];
-  const weightItemsByName = new Map();
+  const itemsByName = new Map();
 
   for (const item of items) {
-    if (!isWeightAlias(item.per)) {
-      merged.push(item);
-      continue;
-    }
-
     const itemNameKey = String(item.itemName ?? "").trim().toUpperCase();
-    const existing = weightItemsByName.get(itemNameKey);
+    const existing = itemsByName.get(itemNameKey);
     if (!existing) {
       const copy = { ...item };
-      weightItemsByName.set(itemNameKey, copy);
+      itemsByName.set(itemNameKey, {
+        item: copy,
+        unitKeys: new Set([getUnitKey(item.per)]),
+      });
       merged.push(copy);
       continue;
     }
 
-    existing.pcs = toNumber(existing.pcs) + toNumber(item.pcs);
-    existing.meters = toNumber(existing.meters) + toNumber(item.meters);
-    existing.weight = toNumber(existing.weight) + toNumber(item.weight);
-    existing.transaction =
-      toNumber(existing.transaction) + toNumber(item.transaction);
+    existing.unitKeys.add(getUnitKey(item.per));
+    existing.item.pcs = toNumber(existing.item.pcs) + toNumber(item.pcs);
+    existing.item.meters =
+      toNumber(existing.item.meters) + toNumber(item.meters);
+    existing.item.weight =
+      toNumber(existing.item.weight) + toNumber(item.weight);
+    existing.item.transaction =
+      toNumber(existing.item.transaction) + toNumber(item.transaction);
+
+    if (existing.unitKeys.size > 1) {
+      existing.item.per = "Mixed units";
+    }
   }
 
   return merged;
@@ -143,8 +151,8 @@ async function getItemWiseSummary(
       totalTransaction: summary._sum.final_amount ?? 0,
       totalUniqueItems: uniqueItems.length,
     },
-    topItems: mergeWeightAliasItems(topItems.map(mapItemSummary)),
-    returnItems: mergeWeightAliasItems(returnItems.map(mapItemSummary)),
+    topItems: mergeItemSummaryItems(topItems.map(mapItemSummary)),
+    returnItems: mergeItemSummaryItems(returnItems.map(mapItemSummary)),
   };
 }
 

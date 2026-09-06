@@ -137,7 +137,7 @@ describe("reportService", () => {
     });
   });
 
-  test("combines W and N item rows while keeping other UOMs separate", async () => {
+  test("combines same item names and marks mixed unit families", async () => {
     reportQueries.findItemSummaryData.mockResolvedValue({
       summary: {
         _sum: { pcs: 2, meters: 0, weight: 1000, taxable: 0, final_amount: 1500 },
@@ -174,19 +174,11 @@ describe("reportService", () => {
     expect(result.topItems).toEqual([
       {
         itemName: "YARN",
-        pcs: 0,
-        meters: 0,
-        weight: 1000,
-        per: "W",
-        transaction: 1500,
-      },
-      {
-        itemName: "YARN",
         pcs: 2,
         meters: 0,
-        weight: 0,
-        per: "PCS",
-        transaction: 100,
+        weight: 1000,
+        per: "Mixed units",
+        transaction: 1600,
       },
     ]);
   });
