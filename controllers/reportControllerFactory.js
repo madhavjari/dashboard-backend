@@ -16,6 +16,54 @@ function normalizePartyName(party) {
   return String(party || "").trim().toUpperCase();
 }
 
+function getAveragePaymentTiming(entries, outstandingField) {
+  const paymentDaysByParty = new Map();
+
+  for (const entry of entries ?? []) {
+    if (Number(entry[outstandingField]) !== 0 || !entry.payments?.length) {
+      continue;
+    }
+
+    const billTime = new Date(entry.billDate).getTime();
+    const finalPaymentTime = entry.payments.reduce((latest, payment) => {
+      const paymentTime = new Date(
+        payment.clearingDate || payment.chequeDate,
+      ).getTime();
+      return Number.isNaN(paymentTime) ? latest : Math.max(latest, paymentTime);
+    }, Number.NEGATIVE_INFINITY);
+
+    if (Number.isNaN(billTime) || !Number.isFinite(finalPaymentTime)) {
+      continue;
+    }
+
+    const party = normalizePartyName(entry.party);
+    if (!party) {
+      continue;
+    }
+    const paymentDays = Math.max(
+      0,
+      Math.round((finalPaymentTime - billTime) / 86_400_000),
+    );
+    const partyDays = paymentDaysByParty.get(party) ?? [];
+    partyDays.push(paymentDays);
+    paymentDaysByParty.set(party, partyDays);
+  }
+
+  const partyAverages = [...paymentDaysByParty.values()].map(
+    (paymentDays) =>
+      paymentDays.reduce((total, days) => total + days, 0) /
+      paymentDays.length,
+  );
+
+  return {
+    averagePaymentDays: partyAverages.length
+      ? partyAverages.reduce((total, average) => total + average, 0) /
+        partyAverages.length
+      : null,
+    partyPaymentCount: partyAverages.length,
+  };
+}
+
 function addOutstandingAmounts(data, outstandingReport, outstandingField) {
   const outstandingByParty = new Map(
     (outstandingReport.partySummary ?? []).map((party) => [
@@ -94,10 +142,17 @@ function createReportController(
           outstandingReport,
           outstandingField,
         );
+        const paymentTiming = getAveragePaymentTiming(
+          outstandingReport.data,
+          outstandingField,
+        );
 
         return res.status(200).json({
           data,
-          outstandingSummary: outstandingReport.summary,
+          outstandingSummary: {
+            ...outstandingReport.summary,
+            ...paymentTiming,
+          },
         });
       } catch (error) {
         return sendInternalServerError(res, error);
