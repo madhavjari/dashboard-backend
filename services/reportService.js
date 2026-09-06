@@ -15,6 +15,40 @@ function mapItemSummary(item) {
   };
 }
 
+function isWeightAlias(per) {
+  const normalized = String(per ?? "").trim().toUpperCase();
+  return normalized === "W" || normalized === "N";
+}
+
+function mergeWeightAliasItems(items) {
+  const merged = [];
+  const weightItemsByName = new Map();
+
+  for (const item of items) {
+    if (!isWeightAlias(item.per)) {
+      merged.push(item);
+      continue;
+    }
+
+    const itemNameKey = String(item.itemName ?? "").trim().toUpperCase();
+    const existing = weightItemsByName.get(itemNameKey);
+    if (!existing) {
+      const copy = { ...item };
+      weightItemsByName.set(itemNameKey, copy);
+      merged.push(copy);
+      continue;
+    }
+
+    existing.pcs = toNumber(existing.pcs) + toNumber(item.pcs);
+    existing.meters = toNumber(existing.meters) + toNumber(item.meters);
+    existing.weight = toNumber(existing.weight) + toNumber(item.weight);
+    existing.transaction =
+      toNumber(existing.transaction) + toNumber(item.transaction);
+  }
+
+  return merged;
+}
+
 function flattenPartyTransactions(rows) {
   return rows.flatMap((row) =>
     row.bill_data.map((item) => ({
@@ -109,8 +143,8 @@ async function getItemWiseSummary(
       totalTransaction: summary._sum.final_amount ?? 0,
       totalUniqueItems: uniqueItems.length,
     },
-    topItems: topItems.map(mapItemSummary),
-    returnItems: returnItems.map(mapItemSummary),
+    topItems: mergeWeightAliasItems(topItems.map(mapItemSummary)),
+    returnItems: mergeWeightAliasItems(returnItems.map(mapItemSummary)),
   };
 }
 

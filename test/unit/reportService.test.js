@@ -137,6 +137,60 @@ describe("reportService", () => {
     });
   });
 
+  test("combines W and N item rows while keeping other UOMs separate", async () => {
+    reportQueries.findItemSummaryData.mockResolvedValue({
+      summary: {
+        _sum: { pcs: 2, meters: 0, weight: 1000, taxable: 0, final_amount: 1500 },
+      },
+      uniqueItems: [{ item_name: "YARN" }],
+      topItems: [
+        {
+          item_name: "YARN",
+          per: "W",
+          _sum: { pcs: 0, meters: 0, weight: 500, final_amount: 700 },
+        },
+        {
+          item_name: "YARN",
+          per: "N",
+          _sum: { pcs: 0, meters: 0, weight: 500, final_amount: 800 },
+        },
+        {
+          item_name: "YARN",
+          per: "PCS",
+          _sum: { pcs: 2, meters: 0, weight: 0, final_amount: 100 },
+        },
+      ],
+      returnItems: [],
+    });
+
+    const result = await reportService.getItemWiseSummary(
+      reportContext,
+      "2025-04-01",
+      "2026-04-01",
+      ["S"],
+      ["SR"],
+    );
+
+    expect(result.topItems).toEqual([
+      {
+        itemName: "YARN",
+        pcs: 0,
+        meters: 0,
+        weight: 1000,
+        per: "W",
+        transaction: 1500,
+      },
+      {
+        itemName: "YARN",
+        pcs: 2,
+        meters: 0,
+        weight: 0,
+        per: "PCS",
+        transaction: 100,
+      },
+    ]);
+  });
+
   test("calculates monthly net amounts", async () => {
     const month = new Date("2025-04-01");
     reportQueries.findMonthlyReportRows.mockResolvedValue([
