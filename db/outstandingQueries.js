@@ -4,6 +4,10 @@ const {
   createCompanyWhere,
 } = require("./reportScope");
 
+function toNumber(value) {
+  return Number(value) || 0;
+}
+
 async function findBillEntries(reportContext, codes, financialYear) {
   const rows = await prisma.billEntry.findMany({
     where: {
@@ -20,9 +24,7 @@ async function findBillEntries(reportContext, codes, financialYear) {
       party: true,
       netAmount: true,
       items: {
-        select: {
-          itemName: true,
-        },
+        select: { itemName: true, pcs: true, meters: true, weight: true, per: true },
       },
     },
     orderBy: { billDate: "desc" },
@@ -38,6 +40,13 @@ async function findBillEntries(reportContext, codes, financialYear) {
     item_names: [
       ...new Set(row.items.map((item) => item.itemName).filter(Boolean)),
     ],
+    items: row.items.map((item) => ({
+      item_name: item.itemName,
+      pcs: toNumber(item.pcs),
+      meters: toNumber(item.meters),
+      weight: toNumber(item.weight),
+      per: item.per,
+    })),
   }));
 }
 

@@ -77,7 +77,15 @@ describe("outstanding financial-year queries", () => {
     expect(prisma.billEntry.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         select: expect.objectContaining({
-          items: { select: { itemName: true } },
+          items: {
+            select: {
+              itemName: true,
+              pcs: true,
+              meters: true,
+              weight: true,
+              per: true,
+            },
+          },
         }),
       }),
     );
