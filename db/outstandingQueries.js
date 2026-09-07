@@ -54,7 +54,13 @@ async function findBillEntries(reportContext, codes, financialYear) {
         },
       },
       items: {
-        select: { itemName: true, pcs: true, meters: true, weight: true, per: true },
+        select: {
+          itemName: true,
+          pcs: true,
+          meters: true,
+          weight: true,
+          per: true,
+        },
       },
     },
     orderBy: { billDate: "desc" },
