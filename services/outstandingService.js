@@ -24,6 +24,17 @@ function createBillPartyKey(accountingCompanyId, billNo, party) {
   ]);
 }
 
+function createBillEntryKey(accountingCompanyId, billEntrySourceId) {
+  return JSON.stringify([
+    String(accountingCompanyId || ""),
+    String(billEntrySourceId ?? "").trim(),
+  ]);
+}
+
+function hasSourceId(value) {
+  return value !== undefined && value !== null && String(value).trim() !== "";
+}
+
 function getPaymentDays(billDate, payment) {
   const paymentDate = payment.clearing_date || payment.cheque_date;
   if (!paymentDate) return null;
@@ -45,19 +56,28 @@ function addPaymentTiming(entry, payment) {
 }
 
 function createOutstandingEntry(entry, outstandingField) {
+  const billAdjustmentAmount = (entry.return_adjustments ?? []).reduce(
+    (total, adjustment) => total + toNumber(adjustment.adjusted_amount),
+    0,
+  );
+  const billAmount = toNumber(entry.net_amount);
+  const outstandingAmount = billAmount - billAdjustmentAmount;
+
   return {
+    billEntrySourceId: entry.bill_entry_source_id,
     billNo: entry.bill_no,
     billDate: entry.bill_date,
     party: entry.party,
     code: entry.code,
     itemNames: entry.item_names ?? [],
     items: entry.items ?? [],
-    billAmount: toNumber(entry.net_amount),
-    adjustedAmount: 0,
+    billAmount,
+    billAdjustmentAmount,
+    adjustedAmount: billAdjustmentAmount,
     unadjustedAmount: 0,
     allocationBalance: 0,
-    [outstandingField]: toNumber(entry.net_amount),
-    overpaidAmount: 0,
+    [outstandingField]: Math.max(0, outstandingAmount),
+    overpaidAmount: Math.max(0, -outstandingAmount),
     totalPaymentDays: 0,
     paymentCount: 0,
     averagePaymentDays: null,
@@ -118,14 +138,50 @@ function buildOutstandingReport(entries, allocations, options) {
     totalReturnField,
     totalOutstandingField,
   } = options;
+  const outstandingEntries = [];
+  const entriesBySourceId = new Map();
   const entriesByBillAndParty = new Map();
-  const returnsByParty = new Map();
+  const returnTotalsByParty = new Map();
+  const unallocatedReturnsByParty = new Map();
+  const appliedReturnsBySourceId = new Map();
+
+  for (const entry of entries) {
+    for (const adjustment of entry.return_adjustments ?? []) {
+      if (!hasSourceId(adjustment.return_bill_entry_source_id)) continue;
+
+      const key = createBillEntryKey(
+        entry.accounting_company_id,
+        adjustment.return_bill_entry_source_id,
+      );
+      appliedReturnsBySourceId.set(
+        key,
+        (appliedReturnsBySourceId.get(key) || 0) +
+          toNumber(adjustment.adjusted_amount),
+      );
+    }
+  }
 
   for (const entry of entries) {
     if (returnCodes.includes(entry.code)) {
-      returnsByParty.set(
+      const returnAmount = toNumber(entry.net_amount);
+      const returnKey = createBillEntryKey(
+        entry.accounting_company_id,
+        entry.bill_entry_source_id,
+      );
+      const appliedReturnAmount = appliedReturnsBySourceId.get(returnKey) || 0;
+      const unallocatedReturnAmount = Math.max(
+        0,
+        returnAmount - appliedReturnAmount,
+      );
+
+      returnTotalsByParty.set(
         entry.party,
-        (returnsByParty.get(entry.party) || 0) + toNumber(entry.net_amount),
+        (returnTotalsByParty.get(entry.party) || 0) + returnAmount,
+      );
+      unallocatedReturnsByParty.set(
+        entry.party,
+        (unallocatedReturnsByParty.get(entry.party) || 0) +
+          unallocatedReturnAmount,
       );
       continue;
     }
@@ -135,41 +191,53 @@ function buildOutstandingReport(entries, allocations, options) {
     }
     if (!entry.bill_no) continue;
 
-    const key = createBillPartyKey(
+    const outstandingEntry = createOutstandingEntry(entry, outstandingField);
+    outstandingEntries.push(outstandingEntry);
+
+    if (hasSourceId(entry.bill_entry_source_id)) {
+      entriesBySourceId.set(
+        createBillEntryKey(
+          entry.accounting_company_id,
+          entry.bill_entry_source_id,
+        ),
+        outstandingEntry,
+      );
+    }
+
+    const legacyKey = createBillPartyKey(
       entry.accounting_company_id,
       entry.bill_no,
       entry.party,
     );
-    const existingEntry = entriesByBillAndParty.get(key);
-    if (existingEntry) {
-      existingEntry.billAmount += toNumber(entry.net_amount);
-      existingEntry.itemNames = [
-        ...new Set([...existingEntry.itemNames, ...(entry.item_names ?? [])]),
-      ];
-      existingEntry.items = [...existingEntry.items, ...(entry.items ?? [])];
-      existingEntry[outstandingField] =
-        existingEntry.billAmount - existingEntry.adjustedAmount;
-      continue;
-    }
-
-    entriesByBillAndParty.set(
-      key,
-      createOutstandingEntry(entry, outstandingField),
-    );
+    const legacyEntries = entriesByBillAndParty.get(legacyKey) || [];
+    legacyEntries.push(outstandingEntry);
+    entriesByBillAndParty.set(legacyKey, legacyEntries);
   }
 
   for (const allocation of allocations) {
-    const entry = entriesByBillAndParty.get(
-      createBillPartyKey(
-        allocation.accounting_company_id,
-        allocation.bill_no,
-        allocation.payment_vouchers.party,
-      ),
-    );
+    let entry;
+    if (hasSourceId(allocation.bill_entry_source_id)) {
+      entry = entriesBySourceId.get(
+        createBillEntryKey(
+          allocation.accounting_company_id,
+          allocation.bill_entry_source_id,
+        ),
+      );
+    } else {
+      const legacyMatches = entriesByBillAndParty.get(
+        createBillPartyKey(
+          allocation.accounting_company_id,
+          allocation.bill_no,
+          allocation.payment_vouchers.party,
+        ),
+      );
+      if (legacyMatches?.length === 1) entry = legacyMatches[0];
+    }
+
     if (entry) addAllocation(entry, allocation, outstandingField);
   }
 
-  const data = [...entriesByBillAndParty.values()];
+  const data = outstandingEntries;
   const partySummaryByParty = new Map();
   const summary = data.reduce(
     (totals, entry) => {
@@ -202,18 +270,19 @@ function buildOutstandingReport(entries, allocations, options) {
     },
   );
 
-  for (const [party, returnAmount] of returnsByParty) {
+  for (const [party, returnAmount] of returnTotalsByParty) {
     const partySummary =
       partySummaryByParty.get(party) || createPartySummary(party, type);
     partySummary[totalReturnField] += returnAmount;
+    const unallocatedReturnAmount = unallocatedReturnsByParty.get(party) || 0;
     partySummary[outstandingField] = Math.max(
       0,
-      partySummary[outstandingField] - returnAmount,
+      partySummary[outstandingField] - unallocatedReturnAmount,
     );
     partySummaryByParty.set(party, partySummary);
   }
 
-  summary[totalReturnField] = [...returnsByParty.values()].reduce(
+  summary[totalReturnField] = [...returnTotalsByParty.values()].reduce(
     (total, amount) => total + amount,
     0,
   );
@@ -234,21 +303,25 @@ async function getOutstandingReport(reportContext, options, financialYear) {
     [...options.transactionCodes, ...options.returnCodes],
     financialYear,
   );
-  const billNumbers = [
+  const billEntries = entries.filter(
+    (entry) => !options.returnCodes.includes(entry.code) && entry.bill_no,
+  );
+  const billEntrySourceIds = [
     ...new Set(
-      entries
-        .filter(
-          (entry) => !options.returnCodes.includes(entry.code) && entry.bill_no,
-        )
-        .map((entry) => entry.bill_no),
+      billEntries
+        .map((entry) => entry.bill_entry_source_id)
+        .filter(hasSourceId)
+        .map(String),
     ),
   ];
+  const billNumbers = [...new Set(billEntries.map((entry) => entry.bill_no))];
   const allocations =
-    billNumbers.length === 0
+    billEntrySourceIds.length === 0 && billNumbers.length === 0
       ? []
       : await outstandingQueries.findPaymentAllocations(
           reportContext,
           options.paymentCode,
+          billEntrySourceIds,
           billNumbers,
           financialYear,
         );

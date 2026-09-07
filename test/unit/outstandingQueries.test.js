@@ -99,6 +99,7 @@ describe("outstanding financial-year queries", () => {
         accountingCompanyIds: ["books-1"],
       },
       "BR",
+      ["100"],
       ["S-1"],
       "2026-2027",
     );
@@ -106,6 +107,10 @@ describe("outstanding financial-year queries", () => {
     expect(prisma.paymentAllocation.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          OR: [
+            { billEntrySourceId: { in: ["100"] } },
+            { billEntrySourceId: null, billNo: { in: ["S-1"] } },
+          ],
           paymentVoucher: {
             financialYear: "2026-2027",
             accountingCompanyId: "books-1",

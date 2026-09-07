@@ -18,11 +18,19 @@ async function findBillEntries(reportContext, codes, financialYear) {
     },
     select: {
       accountingCompanyId: true,
+      entryId: true,
       code: true,
       billNo: true,
       billDate: true,
       party: true,
       netAmount: true,
+      returnAdjustments: {
+        select: {
+          sourceEntryId: true,
+          returnBillEntryId: true,
+          adjustedAmount: true,
+        },
+      },
       items: {
         select: { itemName: true, pcs: true, meters: true, weight: true, per: true },
       },
@@ -32,11 +40,17 @@ async function findBillEntries(reportContext, codes, financialYear) {
 
   return rows.map((row) => ({
     accounting_company_id: row.accountingCompanyId,
+    bill_entry_source_id: row.entryId,
     code: row.code,
     bill_no: row.billNo,
     bill_date: row.billDate,
     party: row.party,
     net_amount: row.netAmount,
+    return_adjustments: (row.returnAdjustments ?? []).map((adjustment) => ({
+      source_entry_id: adjustment.sourceEntryId,
+      return_bill_entry_source_id: adjustment.returnBillEntryId,
+      adjusted_amount: adjustment.adjustedAmount,
+    })),
     item_names: [
       ...new Set(row.items.map((item) => item.itemName).filter(Boolean)),
     ],
@@ -53,14 +67,31 @@ async function findBillEntries(reportContext, codes, financialYear) {
 async function findPaymentAllocations(
   reportContext,
   codes,
+  billEntrySourceIds,
   billNumbers,
   financialYear,
 ) {
+  const sourceIds = [
+    ...new Set(billEntrySourceIds.filter(Boolean).map(String)),
+  ];
+  const legacyBillNumbers = [...new Set(billNumbers.filter(Boolean))];
+  const linkFilters = [];
+
+  if (sourceIds.length > 0) {
+    linkFilters.push({ billEntrySourceId: { in: sourceIds } });
+  }
+  if (legacyBillNumbers.length > 0) {
+    linkFilters.push({
+      billEntrySourceId: null,
+      billNo: { in: legacyBillNumbers },
+    });
+  }
+
   const rows = await prisma.paymentAllocation.findMany({
     where: {
       ...createCompanyWhere(reportContext),
       code: { in: codes },
-      billNo: { in: billNumbers },
+      OR: linkFilters,
       paymentVoucher: {
         financialYear,
         ...createAccountingCompanyWhere(reportContext),
@@ -68,6 +99,7 @@ async function findPaymentAllocations(
     },
     select: {
       billNo: true,
+      billEntrySourceId: true,
       adjustedAmount: true,
       unadjustedAmount: true,
       balanceAmount: true,
@@ -86,6 +118,7 @@ async function findPaymentAllocations(
 
   return rows.map((row) => ({
     accounting_company_id: row.paymentVoucher.accountingCompanyId,
+    bill_entry_source_id: row.billEntrySourceId,
     bill_no: row.billNo,
     adjust_amt: row.adjustedAmount,
     unadj_amt: row.unadjustedAmount,

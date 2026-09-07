@@ -80,6 +80,7 @@ describe("outstandingService.getSales", () => {
     expect(outstandingQueries.findPaymentAllocations).toHaveBeenCalledWith(
       undefined,
       ["BR", "CR"],
+      [],
       ["S-100", "S-101"],
       DEFAULT_FINANCIAL_YEAR,
     );
@@ -103,6 +104,116 @@ describe("outstandingService.getSales", () => {
       partySummary: [],
     });
     expect(outstandingQueries.findPaymentAllocations).not.toHaveBeenCalled();
+  });
+
+  test("matches an allocation by bill entry source ID instead of bill number", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-1",
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2026-04-05"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+      },
+      {
+        accounting_company_id: "books-1",
+        bill_entry_source_id: "101",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2026-04-06"),
+        party: "ACME TEXTILES",
+        net_amount: "500.00",
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
+      {
+        accounting_company_id: "books-1",
+        bill_entry_source_id: "101",
+        bill_no: "S-1",
+        adjust_amt: "500.00",
+        unadj_amt: "0.00",
+        bal_amt: "0.00",
+        payment_vouchers: {
+          mode: "CASH",
+          party: "ACME TEXTILES",
+          cheque_date: null,
+          clearing_date: null,
+          net_amount: "500.00",
+        },
+      },
+    ]);
+
+    const report = await getSales();
+
+    expect(report.data).toEqual([
+      expect.objectContaining({
+        billEntrySourceId: "100",
+        amountToCollect: 1000,
+        adjustedAmount: 0,
+      }),
+      expect.objectContaining({
+        billEntrySourceId: "101",
+        amountToCollect: 0,
+        adjustedAmount: 500,
+      }),
+    ]);
+  });
+
+  test("applies a linked bill return adjustment once to the target bill", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-1",
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2026-04-05"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+        return_adjustments: [
+          {
+            return_bill_entry_source_id: "900",
+            adjusted_amount: "250.00",
+          },
+        ],
+      },
+      {
+        accounting_company_id: "books-1",
+        bill_entry_source_id: "900",
+        code: "SR",
+        bill_no: "SR-1",
+        bill_date: new Date("2026-04-06"),
+        party: "ACME TEXTILES",
+        net_amount: "250.00",
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([]);
+
+    const report = await getSales();
+
+    expect(report.data[0]).toEqual(
+      expect.objectContaining({
+        billEntrySourceId: "100",
+        billAdjustmentAmount: 250,
+        adjustedAmount: 250,
+        amountToCollect: 750,
+      }),
+    );
+    expect(report.summary).toEqual(
+      expect.objectContaining({
+        totalSalesReturnAmount: 250,
+        totalToCollect: 750,
+        totalAdjustedAmount: 250,
+      }),
+    );
+    expect(report.partySummary).toEqual([
+      expect.objectContaining({
+        party: "ACME TEXTILES",
+        totalSalesReturnAmount: 250,
+        amountToCollect: 750,
+      }),
+    ]);
   });
 
   test("subtracts sales returns from the affected party's amount to collect", async () => {
@@ -228,6 +339,7 @@ describe("outstandingService.getPurchases", () => {
     expect(outstandingQueries.findPaymentAllocations).toHaveBeenCalledWith(
       undefined,
       ["BP", "CP"],
+      [],
       ["P-100"],
       DEFAULT_FINANCIAL_YEAR,
     );
