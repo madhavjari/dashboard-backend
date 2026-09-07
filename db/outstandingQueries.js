@@ -118,9 +118,6 @@ async function findPaymentAllocations(
       ...createCompanyWhere(reportContext),
       code: { in: codes },
       OR: linkFilters,
-      paymentVoucher: {
-        ...createAccountingCompanyWhere(reportContext),
-      },
     },
     select: {
       billNo: true,

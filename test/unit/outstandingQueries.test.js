@@ -91,7 +91,7 @@ describe("outstanding financial-year queries", () => {
     );
   });
 
-  test("uses only allocations from the selected financial year", async () => {
+  test("does not filter allocations by the voucher's accounting company", async () => {
     await findPaymentAllocations(
       {
         mode: "authenticated",
@@ -110,9 +110,6 @@ describe("outstanding financial-year queries", () => {
             { billEntrySourceId: { in: ["100"] } },
             { billEntrySourceId: null, billNo: { in: ["S-1"] } },
           ],
-          paymentVoucher: {
-            accountingCompanyId: "books-1",
-          },
         }),
       }),
     );
