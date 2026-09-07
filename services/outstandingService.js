@@ -47,6 +47,10 @@ function hasSourceId(value) {
   return value !== undefined && value !== null && String(value).trim() !== "";
 }
 
+function getAccountingCompanyKey(record) {
+  return record.accounting_company_key ?? record.accounting_company_id;
+}
+
 function getPaymentDays(billDate, payment) {
   const paymentDate = payment.clearing_date || payment.cheque_date;
   if (!paymentDate) return null;
@@ -163,7 +167,7 @@ function buildOutstandingReport(entries, allocations, options) {
       if (!hasSourceId(adjustment.return_bill_entry_source_id)) continue;
 
       const key = createBillEntryKey(
-        entry.accounting_company_id,
+        getAccountingCompanyKey(entry),
         adjustment.return_bill_entry_source_id,
       );
       appliedReturnsBySourceId.set(
@@ -178,7 +182,7 @@ function buildOutstandingReport(entries, allocations, options) {
     if (returnCodes.includes(entry.code)) {
       const returnAmount = toNumber(entry.net_amount);
       const returnKey = createBillEntryKey(
-        entry.accounting_company_id,
+        getAccountingCompanyKey(entry),
         entry.bill_entry_source_id,
       );
       const appliedReturnAmount = appliedReturnsBySourceId.get(returnKey) || 0;
@@ -209,7 +213,7 @@ function buildOutstandingReport(entries, allocations, options) {
 
     if (hasSourceId(entry.bill_entry_source_id)) {
       const sourceKey = createBillEntryKey(
-        entry.accounting_company_id,
+        getAccountingCompanyKey(entry),
         entry.bill_entry_source_id,
       );
       const sourceEntries = entriesBySourceId.get(sourceKey) || [];
@@ -217,7 +221,7 @@ function buildOutstandingReport(entries, allocations, options) {
       entriesBySourceId.set(sourceKey, sourceEntries);
       entriesBySourceAndNumber.set(
         createBillEntryNumberKey(
-          entry.accounting_company_id,
+          getAccountingCompanyKey(entry),
           entry.bill_entry_source_id,
           entry.bill_no,
         ),
@@ -226,7 +230,7 @@ function buildOutstandingReport(entries, allocations, options) {
     }
 
     const legacyKey = createBillPartyKey(
-      entry.accounting_company_id,
+      getAccountingCompanyKey(entry),
       entry.bill_no,
       entry.party,
     );
@@ -241,7 +245,7 @@ function buildOutstandingReport(entries, allocations, options) {
       if (hasSourceId(allocation.bill_no)) {
         entry = entriesBySourceAndNumber.get(
           createBillEntryNumberKey(
-            allocation.accounting_company_id,
+            getAccountingCompanyKey(allocation),
             allocation.bill_entry_source_id,
             allocation.bill_no,
           ),
@@ -249,7 +253,7 @@ function buildOutstandingReport(entries, allocations, options) {
       } else {
         const sourceMatches = entriesBySourceId.get(
           createBillEntryKey(
-            allocation.accounting_company_id,
+            getAccountingCompanyKey(allocation),
             allocation.bill_entry_source_id,
           ),
         );
@@ -258,7 +262,7 @@ function buildOutstandingReport(entries, allocations, options) {
     } else {
       const legacyMatches = entriesByBillAndParty.get(
         createBillPartyKey(
-          allocation.accounting_company_id,
+          getAccountingCompanyKey(allocation),
           allocation.bill_no,
           allocation.payment_vouchers.party,
         ),

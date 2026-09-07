@@ -23,7 +23,7 @@ function groupAccountingCompanies(companies) {
   const groups = new Map();
 
   for (const company of companies) {
-    const key = `${company.syncSourceId}\u0000${normalizeAccountingCompanyName(
+    const key = `${company.companyId}\u0000${normalizeAccountingCompanyName(
       company.name,
     )}`;
     const existing = groups.get(key);
@@ -73,7 +73,7 @@ async function findAvailableAccountingCompanies(reportContext) {
     orderBy: [{ name: "asc" }, { id: "asc" }],
     select: {
       id: true,
-      syncSourceId: true,
+      companyId: true,
       name: true,
       company: { select: { name: true } },
     },

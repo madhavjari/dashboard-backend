@@ -160,6 +160,72 @@ describe("outstandingService.getSales", () => {
     ]);
   });
 
+  test("matches split allocations when the company CompNo changes between years", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-2025",
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        bill_entry_source_id: "2960",
+        code: "S",
+        bill_no: "S-4",
+        bill_date: new Date("2025-04-05"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
+      {
+        accounting_company_id: "books-2026",
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        bill_entry_source_id: "2960",
+        bill_no: "S-4",
+        adjust_amt: "400.00",
+        unadj_amt: "0.00",
+        bal_amt: "600.00",
+        payment_vouchers: {
+          mode: "BANK",
+          party: "ACME TEXTILES",
+          cheque_date: null,
+          clearing_date: null,
+          net_amount: "400.00",
+        },
+      },
+      {
+        accounting_company_id: "books-2026",
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        bill_entry_source_id: "2960",
+        bill_no: "S-4",
+        adjust_amt: "600.00",
+        unadj_amt: "0.00",
+        bal_amt: "0.00",
+        payment_vouchers: {
+          mode: "BANK",
+          party: "ACME TEXTILES",
+          cheque_date: null,
+          clearing_date: null,
+          net_amount: "600.00",
+        },
+      },
+    ]);
+
+    const report = await getSales({
+      mode: "authenticated",
+      companyIds: ["company-1"],
+    });
+
+    expect(report.data[0]).toEqual(
+      expect.objectContaining({
+        billEntrySourceId: "2960",
+        adjustedAmount: 1000,
+        amountToCollect: 0,
+        payments: [
+          expect.objectContaining({ adjustedAmount: 400 }),
+          expect.objectContaining({ adjustedAmount: 600 }),
+        ],
+      }),
+    );
+  });
+
   test("applies a linked bill return adjustment once to the target bill", async () => {
     outstandingQueries.findBillEntries.mockResolvedValue([
       {

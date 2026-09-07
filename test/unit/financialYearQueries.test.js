@@ -46,7 +46,7 @@ describe("findAvailableFinancialYears", () => {
     const companies = [
       {
         id: "books-1",
-        syncSourceId: "source-1",
+        companyId: "company-1",
         name: "North Division",
         company: { name: "Owner Workspace" },
       },
@@ -72,7 +72,7 @@ describe("findAvailableFinancialYears", () => {
       orderBy: [{ name: "asc" }, { id: "asc" }],
       select: {
         id: true,
-        syncSourceId: true,
+        companyId: true,
         name: true,
         company: { select: { name: true } },
       },
@@ -83,19 +83,19 @@ describe("findAvailableFinancialYears", () => {
     prisma.accountingCompany.findMany.mockResolvedValue([
       {
         id: "books-1",
-        syncSourceId: "source-1",
+        companyId: "company-1",
         name: " Madhav   Enterprise ",
         company: { name: "Owner Workspace" },
       },
       {
         id: "books-2",
-        syncSourceId: "source-1",
+        companyId: "company-1",
         name: "MADHAV ENTERPRISE",
         company: { name: "Owner Workspace" },
       },
       {
         id: "books-3",
-        syncSourceId: "source-2",
+        companyId: "company-2",
         name: "MADHAV ENTERPRISE",
         company: { name: "Owner Workspace" },
       },

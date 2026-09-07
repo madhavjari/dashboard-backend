@@ -8,6 +8,24 @@ function toNumber(value) {
   return Number(value) || 0;
 }
 
+function createAccountingCompanyKey(
+  accountingCompany,
+  fallbackId,
+  ownerCompanyId,
+) {
+  const companyId = ownerCompanyId || accountingCompany?.companyId;
+  const name = String(accountingCompany?.name ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleUpperCase();
+
+  if (companyId && name) {
+    return JSON.stringify([companyId, name]);
+  }
+
+  return fallbackId;
+}
+
 async function findBillEntries(reportContext, codes, financialYear) {
   const rows = await prisma.billEntry.findMany({
     where: {
@@ -17,7 +35,11 @@ async function findBillEntries(reportContext, codes, financialYear) {
       code: { in: codes },
     },
     select: {
+      companyId: true,
       accountingCompanyId: true,
+      accountingCompany: {
+        select: { syncSourceId: true, name: true },
+      },
       entryId: true,
       code: true,
       billNo: true,
@@ -40,6 +62,11 @@ async function findBillEntries(reportContext, codes, financialYear) {
 
   return rows.map((row) => ({
     accounting_company_id: row.accountingCompanyId,
+    accounting_company_key: createAccountingCompanyKey(
+      row.accountingCompany,
+      row.accountingCompanyId,
+      row.companyId,
+    ),
     bill_entry_source_id: row.entryId,
     code: row.code,
     bill_no: row.billNo,
@@ -103,7 +130,11 @@ async function findPaymentAllocations(
       balanceAmount: true,
       paymentVoucher: {
         select: {
+          companyId: true,
           accountingCompanyId: true,
+          accountingCompany: {
+            select: { syncSourceId: true, name: true },
+          },
           mode: true,
           party: true,
           chequeDate: true,
@@ -116,6 +147,11 @@ async function findPaymentAllocations(
 
   return rows.map((row) => ({
     accounting_company_id: row.paymentVoucher.accountingCompanyId,
+    accounting_company_key: createAccountingCompanyKey(
+      row.paymentVoucher.accountingCompany,
+      row.paymentVoucher.accountingCompanyId,
+      row.paymentVoucher.companyId,
+    ),
     bill_entry_source_id: row.billEntrySourceId,
     bill_no: row.billNo,
     adjust_amt: row.adjustedAmount,
