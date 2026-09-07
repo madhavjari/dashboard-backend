@@ -101,7 +101,6 @@ describe("outstanding financial-year queries", () => {
       "BR",
       ["100"],
       ["S-1"],
-      "2026-2027",
     );
 
     expect(prisma.paymentAllocation.findMany).toHaveBeenCalledWith(
@@ -112,7 +111,6 @@ describe("outstanding financial-year queries", () => {
             { billEntrySourceId: null, billNo: { in: ["S-1"] } },
           ],
           paymentVoucher: {
-            financialYear: "2026-2027",
             accountingCompanyId: "books-1",
           },
         }),

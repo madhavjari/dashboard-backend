@@ -69,7 +69,6 @@ async function findPaymentAllocations(
   codes,
   billEntrySourceIds,
   billNumbers,
-  financialYear,
 ) {
   const sourceIds = [
     ...new Set(billEntrySourceIds.filter(Boolean).map(String)),
@@ -93,7 +92,6 @@ async function findPaymentAllocations(
       code: { in: codes },
       OR: linkFilters,
       paymentVoucher: {
-        financialYear,
         ...createAccountingCompanyWhere(reportContext),
       },
     },

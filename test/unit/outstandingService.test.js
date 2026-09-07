@@ -82,7 +82,6 @@ describe("outstandingService.getSales", () => {
       ["BR", "CR"],
       [],
       ["S-100", "S-101"],
-      DEFAULT_FINANCIAL_YEAR,
     );
   });
 
@@ -341,7 +340,6 @@ describe("outstandingService.getPurchases", () => {
       ["BP", "CP"],
       [],
       ["P-100"],
-      DEFAULT_FINANCIAL_YEAR,
     );
   });
 

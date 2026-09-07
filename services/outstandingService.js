@@ -323,7 +323,6 @@ async function getOutstandingReport(reportContext, options, financialYear) {
           options.paymentCode,
           billEntrySourceIds,
           billNumbers,
-          financialYear,
         );
 
   return buildOutstandingReport(entries, allocations, options);
