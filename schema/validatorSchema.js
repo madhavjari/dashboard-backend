@@ -318,6 +318,7 @@ const paymentAllocationSchema = z
       .optional(),
     code: nullableTextSchema(100),
     billNo: nullableTextSchema(100),
+    billEntrySourceId: nullableTextSchema(100),
     date: nullableDateSchema,
     mode: nullableTextSchema(100),
     billAmt: nullableDecimalSchema,

@@ -128,6 +128,7 @@ function mapPaymentAllocation(allocation, { companyId, paymentVoucherId }) {
     entryId: nullable(allocation.entryId),
     code: nullable(allocation.code),
     billNo: nullable(allocation.billNo),
+    billEntrySourceId: nullable(allocation.billEntrySourceId),
     allocationDate: nullable(allocation.date),
     mode: nullable(allocation.mode),
     billAmount: nullable(allocation.billAmt),

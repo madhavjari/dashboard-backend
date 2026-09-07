@@ -66,6 +66,7 @@ const validVoucher = {
     {
       entryId: 1,
       code: "BR",
+      billEntrySourceId: "9876",
       billNo: "S-100",
       date: "2026-08-20T00:00:00.000Z",
       adjustAmt: 500,
@@ -222,6 +223,7 @@ describe("POST /api/v1/sync/vouchers", () => {
           items: [
             expect.objectContaining({
               entryId: "1",
+              billEntrySourceId: "9876",
               adjustAmt: 500,
             }),
           ],

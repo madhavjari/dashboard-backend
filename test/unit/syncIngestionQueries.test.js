@@ -221,6 +221,7 @@ describe("ingestPaymentVouchers", () => {
         {
           entryId: "1",
           code: "BR",
+          billEntrySourceId: "9876",
           billNo: "S-100",
           date: new Date("2026-08-20T00:00:00.000Z"),
           mode: "Against Ref",
@@ -290,6 +291,7 @@ describe("ingestPaymentVouchers", () => {
           companyId: "account_1",
           paymentVoucherId: 22n,
           entryId: "1",
+          billEntrySourceId: "9876",
           billNo: "S-100",
           adjustedAmount: "500.00",
           balanceAmount: "680.00",
