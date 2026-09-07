@@ -12,6 +12,38 @@ function sortFinancialYears(financialYears) {
   });
 }
 
+function normalizeAccountingCompanyName(name) {
+  return String(name ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleUpperCase();
+}
+
+function groupAccountingCompanies(companies) {
+  const groups = new Map();
+
+  for (const company of companies) {
+    const key = `${company.syncSourceId}\u0000${normalizeAccountingCompanyName(
+      company.name,
+    )}`;
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.accountingCompanyIds.push(company.id);
+      continue;
+    }
+
+    groups.set(key, {
+      id: company.id,
+      name: company.name,
+      company: company.company,
+      accountingCompanyIds: [company.id],
+    });
+  }
+
+  return [...groups.values()];
+}
+
 async function findAvailableFinancialYears(reportContext) {
   const companyWhere = createCompanyWhere(reportContext);
   const accountingCompanyWhere = createAccountingCompanyWhere(reportContext);
@@ -36,15 +68,18 @@ async function findAvailableFinancialYears(reportContext) {
 }
 
 async function findAvailableAccountingCompanies(reportContext) {
-  return prisma.accountingCompany.findMany({
+  const companies = await prisma.accountingCompany.findMany({
     where: createCompanyWhere(reportContext),
     orderBy: [{ name: "asc" }, { id: "asc" }],
     select: {
       id: true,
+      syncSourceId: true,
       name: true,
       company: { select: { name: true } },
     },
   });
+
+  return groupAccountingCompanies(companies);
 }
 
 module.exports = {

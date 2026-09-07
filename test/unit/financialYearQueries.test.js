@@ -46,6 +46,7 @@ describe("findAvailableFinancialYears", () => {
     const companies = [
       {
         id: "books-1",
+        syncSourceId: "source-1",
         name: "North Division",
         company: { name: "Owner Workspace" },
       },
@@ -57,16 +58,67 @@ describe("findAvailableFinancialYears", () => {
         mode: "authenticated",
         companyIds: ["company-1", "company-2"],
       }),
-    ).resolves.toEqual(companies);
+    ).resolves.toEqual([
+      {
+        id: "books-1",
+        name: "North Division",
+        company: { name: "Owner Workspace" },
+        accountingCompanyIds: ["books-1"],
+      },
+    ]);
 
     expect(prisma.accountingCompany.findMany).toHaveBeenCalledWith({
       where: { companyId: { in: ["company-1", "company-2"] } },
       orderBy: [{ name: "asc" }, { id: "asc" }],
       select: {
         id: true,
+        syncSourceId: true,
         name: true,
         company: { select: { name: true } },
       },
     });
+  });
+
+  test("groups financial-year companies with the same name from one source", async () => {
+    prisma.accountingCompany.findMany.mockResolvedValue([
+      {
+        id: "books-1",
+        syncSourceId: "source-1",
+        name: " Madhav   Enterprise ",
+        company: { name: "Owner Workspace" },
+      },
+      {
+        id: "books-2",
+        syncSourceId: "source-1",
+        name: "MADHAV ENTERPRISE",
+        company: { name: "Owner Workspace" },
+      },
+      {
+        id: "books-3",
+        syncSourceId: "source-2",
+        name: "MADHAV ENTERPRISE",
+        company: { name: "Owner Workspace" },
+      },
+    ]);
+
+    await expect(
+      findAvailableAccountingCompanies({
+        mode: "authenticated",
+        companyIds: ["company-1"],
+      }),
+    ).resolves.toEqual([
+      {
+        id: "books-1",
+        name: " Madhav   Enterprise ",
+        company: { name: "Owner Workspace" },
+        accountingCompanyIds: ["books-1", "books-2"],
+      },
+      {
+        id: "books-3",
+        name: "MADHAV ENTERPRISE",
+        company: { name: "Owner Workspace" },
+        accountingCompanyIds: ["books-3"],
+      },
+    ]);
   });
 });

@@ -31,6 +31,18 @@ function createBillEntryKey(accountingCompanyId, billEntrySourceId) {
   ]);
 }
 
+function createBillEntryNumberKey(
+  accountingCompanyId,
+  billEntrySourceId,
+  billNo,
+) {
+  return JSON.stringify([
+    String(accountingCompanyId || ""),
+    String(billEntrySourceId ?? "").trim(),
+    String(billNo ?? "").trim().toUpperCase(),
+  ]);
+}
+
 function hasSourceId(value) {
   return value !== undefined && value !== null && String(value).trim() !== "";
 }
@@ -140,6 +152,7 @@ function buildOutstandingReport(entries, allocations, options) {
   } = options;
   const outstandingEntries = [];
   const entriesBySourceId = new Map();
+  const entriesBySourceAndNumber = new Map();
   const entriesByBillAndParty = new Map();
   const returnTotalsByParty = new Map();
   const unallocatedReturnsByParty = new Map();
@@ -195,10 +208,18 @@ function buildOutstandingReport(entries, allocations, options) {
     outstandingEntries.push(outstandingEntry);
 
     if (hasSourceId(entry.bill_entry_source_id)) {
-      entriesBySourceId.set(
-        createBillEntryKey(
+      const sourceKey = createBillEntryKey(
+        entry.accounting_company_id,
+        entry.bill_entry_source_id,
+      );
+      const sourceEntries = entriesBySourceId.get(sourceKey) || [];
+      sourceEntries.push(outstandingEntry);
+      entriesBySourceId.set(sourceKey, sourceEntries);
+      entriesBySourceAndNumber.set(
+        createBillEntryNumberKey(
           entry.accounting_company_id,
           entry.bill_entry_source_id,
+          entry.bill_no,
         ),
         outstandingEntry,
       );
@@ -217,12 +238,23 @@ function buildOutstandingReport(entries, allocations, options) {
   for (const allocation of allocations) {
     let entry;
     if (hasSourceId(allocation.bill_entry_source_id)) {
-      entry = entriesBySourceId.get(
-        createBillEntryKey(
-          allocation.accounting_company_id,
-          allocation.bill_entry_source_id,
-        ),
-      );
+      if (hasSourceId(allocation.bill_no)) {
+        entry = entriesBySourceAndNumber.get(
+          createBillEntryNumberKey(
+            allocation.accounting_company_id,
+            allocation.bill_entry_source_id,
+            allocation.bill_no,
+          ),
+        );
+      } else {
+        const sourceMatches = entriesBySourceId.get(
+          createBillEntryKey(
+            allocation.accounting_company_id,
+            allocation.bill_entry_source_id,
+          ),
+        );
+        if (sourceMatches?.length === 1) entry = sourceMatches[0];
+      }
     } else {
       const legacyMatches = entriesByBillAndParty.get(
         createBillPartyKey(

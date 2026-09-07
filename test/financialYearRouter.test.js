@@ -43,11 +43,13 @@ describe("GET /api/v1/reports/accounting-companies", () => {
         id: "company-books-1",
         name: "North Division",
         company: { name: "Owner Workspace" },
+        accountingCompanyIds: ["company-books-1"],
       },
       {
         id: "company-books-2",
         name: "South Division",
         company: { name: "Owner Workspace" },
+        accountingCompanyIds: ["company-books-2"],
       },
     ]);
 
@@ -62,11 +64,13 @@ describe("GET /api/v1/reports/accounting-companies", () => {
           id: "company-books-1",
           name: "North Division",
           accountName: "Owner Workspace",
+          accountingCompanyIds: ["company-books-1"],
         },
         {
           id: "company-books-2",
           name: "South Division",
           accountName: "Owner Workspace",
+          accountingCompanyIds: ["company-books-2"],
         },
       ],
     });

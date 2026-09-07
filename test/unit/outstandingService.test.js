@@ -120,7 +120,7 @@ describe("outstandingService.getSales", () => {
         accounting_company_id: "books-1",
         bill_entry_source_id: "101",
         code: "S",
-        bill_no: "S-1",
+        bill_no: "S-2",
         bill_date: new Date("2026-04-06"),
         party: "ACME TEXTILES",
         net_amount: "500.00",
@@ -130,7 +130,7 @@ describe("outstandingService.getSales", () => {
       {
         accounting_company_id: "books-1",
         bill_entry_source_id: "101",
-        bill_no: "S-1",
+        bill_no: "S-2",
         adjust_amt: "500.00",
         unadj_amt: "0.00",
         bal_amt: "0.00",

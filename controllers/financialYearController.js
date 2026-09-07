@@ -12,6 +12,7 @@ async function getAccountingCompanies(req, res) {
       id: company.id,
       name: company.name,
       accountName: company.company.name,
+      accountingCompanyIds: company.accountingCompanyIds,
     }));
     return res.status(200).json({ data });
   } catch (error) {
