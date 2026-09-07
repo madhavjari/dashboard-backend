@@ -6,6 +6,8 @@ jest.mock("../../lib/prisma", () => ({
 
 const { prisma } = require("../../lib/prisma");
 const {
+  deleteBills,
+  deletePaymentVouchers,
   ingestBills,
   ingestPaymentVouchers,
 } = require("../../db/syncIngestionQueries");
@@ -16,7 +18,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   tx = {
     accountingCompany: { findMany: jest.fn() },
-    billEntry: { upsert: jest.fn() },
+    billEntry: { upsert: jest.fn(), deleteMany: jest.fn() },
     billItem: {
       deleteMany: jest.fn(),
       createMany: jest.fn(),
@@ -25,7 +27,7 @@ beforeEach(() => {
       deleteMany: jest.fn(),
       createMany: jest.fn(),
     },
-    paymentVoucher: { upsert: jest.fn() },
+    paymentVoucher: { upsert: jest.fn(), deleteMany: jest.fn() },
     paymentAllocation: {
       deleteMany: jest.fn(),
       createMany: jest.fn(),
@@ -350,5 +352,44 @@ describe("ingestPaymentVouchers", () => {
       unknownExternalCompanyIds: ["2"],
     });
     expect(tx.paymentVoucher.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("synchronized deletes", () => {
+  const records = [
+    { financialYear: "2025-2026", compNo: "1", entryId: "100" },
+    { financialYear: "2026-2027", compNo: "2", entryId: "100" },
+  ];
+
+  it.each([
+    ["bills", deleteBills, "billEntry"],
+    ["vouchers", deletePaymentVouchers, "paymentVoucher"],
+  ])("deletes exact tenant and financial-year scoped %s", async (
+    _label,
+    deleteRecords,
+    model,
+  ) => {
+    tx[model].deleteMany.mockResolvedValue({ count: 2 });
+
+    await expect(deleteRecords({
+      companyId: "account_1",
+      syncSourceId: "source_1",
+      records,
+    })).resolves.toEqual({ count: 2 });
+
+    expect(tx[model].deleteMany).toHaveBeenCalledWith({
+      where: {
+        companyId: "account_1",
+        syncSourceId: "source_1",
+        OR: [
+          { financialYear: "2025-2026", compNo: "1", entryId: "100" },
+          { financialYear: "2026-2027", compNo: "2", entryId: "100" },
+        ],
+      },
+    });
+    expect(tx.syncSource.update).toHaveBeenCalledWith({
+      where: { companyId_id: { companyId: "account_1", id: "source_1" } },
+      data: { lastSyncedAt: expect.any(Date) },
+    });
   });
 });

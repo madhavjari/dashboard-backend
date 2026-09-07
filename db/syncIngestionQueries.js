@@ -324,7 +324,63 @@ async function ingestPaymentVouchers({ companyId, syncSourceId, vouchers }) {
   );
 }
 
+async function deleteSynchronizedRecords({
+  companyId,
+  syncSourceId,
+  records,
+  model,
+}) {
+  return prisma.$transaction(
+    async (tx) => {
+      const result = await tx[model].deleteMany({
+        where: {
+          companyId,
+          syncSourceId,
+          OR: records.map(({ financialYear, compNo, entryId }) => ({
+            financialYear,
+            compNo,
+            entryId,
+          })),
+        },
+      });
+
+      await tx.syncSource.update({
+        where: {
+          companyId_id: {
+            companyId,
+            id: syncSourceId,
+          },
+        },
+        data: { lastSyncedAt: new Date() },
+      });
+
+      return { count: result.count };
+    },
+    { timeout: 30_000 },
+  );
+}
+
+function deleteBills({ companyId, syncSourceId, records }) {
+  return deleteSynchronizedRecords({
+    companyId,
+    syncSourceId,
+    records,
+    model: "billEntry",
+  });
+}
+
+function deletePaymentVouchers({ companyId, syncSourceId, records }) {
+  return deleteSynchronizedRecords({
+    companyId,
+    syncSourceId,
+    records,
+    model: "paymentVoucher",
+  });
+}
+
 module.exports = {
+  deleteBills,
+  deletePaymentVouchers,
   ingestBills,
   ingestPaymentVouchers,
 };

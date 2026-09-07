@@ -5,6 +5,7 @@ const { validate } = require("../middleware/zodValidator");
 const {
   syncBillsSchema,
   syncCompaniesSchema,
+  syncRecordDeletionsSchema,
   syncVouchersSchema,
 } = require("../schema/validatorSchema");
 
@@ -19,6 +20,13 @@ syncRouter.post(
   syncController.postAccountingCompanies,
 );
 
+syncRouter.delete(
+  "/api/v1/sync/bills",
+  syncApiKeyAuth,
+  validate(syncRecordDeletionsSchema),
+  syncController.deleteBills,
+);
+
 //use of resolved company by creating Set() of companies
 // and Map()(key value pair) of companies and its externalid
 syncRouter.post(
@@ -26,6 +34,13 @@ syncRouter.post(
   syncApiKeyAuth,
   validate(syncBillsSchema),
   syncController.postBills,
+);
+
+syncRouter.delete(
+  "/api/v1/sync/vouchers",
+  syncApiKeyAuth,
+  validate(syncRecordDeletionsSchema),
+  syncController.deletePaymentVouchers,
 );
 
 syncRouter.post(

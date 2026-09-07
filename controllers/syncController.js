@@ -1,8 +1,36 @@
 const { upsertAccountingCompanies } = require("../db/accountingCompanyQueries");
 const {
+  deleteBills: deleteBillRecords,
+  deletePaymentVouchers: deletePaymentVoucherRecords,
   ingestBills,
   ingestPaymentVouchers,
 } = require("../db/syncIngestionQueries");
+
+function createDeleteHandler(deleteRecords, label) {
+  return async function deleteSynchronizedRecords(req, res) {
+    try {
+      const result = await deleteRecords({
+        companyId: req.syncAuth.companyId,
+        syncSourceId: req.syncAuth.syncSourceId,
+        records: req.body,
+      });
+      return res.status(200).json({
+        success: true,
+        message: `Deleted ${result.count} ${label}(s).`,
+        count: result.count,
+      });
+    } catch (error) {
+      console.error(`Failed to delete synchronized ${label}s:`, error);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  };
+}
+
+const deleteBills = createDeleteHandler(deleteBillRecords, "bill");
+const deletePaymentVouchers = createDeleteHandler(
+  deletePaymentVoucherRecords,
+  "voucher",
+);
 
 async function postAccountingCompanies(req, res) {
   try {
@@ -80,6 +108,8 @@ async function postPaymentVouchers(req, res) {
 }
 
 module.exports = {
+  deleteBills,
+  deletePaymentVouchers,
   postAccountingCompanies,
   postBills,
   postPaymentVouchers,

@@ -6,12 +6,16 @@ jest.mock("../db/syncSourceQueries", () => ({
   provisionSyncSource: jest.fn(),
 }));
 jest.mock("../db/syncIngestionQueries", () => ({
+  deleteBills: jest.fn(),
+  deletePaymentVouchers: jest.fn(),
   ingestBills: jest.fn(),
   ingestPaymentVouchers: jest.fn(),
 }));
 
 const { authenticateSyncApiKey } = require("../db/syncSourceQueries");
 const {
+  deleteBills,
+  deletePaymentVouchers,
   ingestBills,
   ingestPaymentVouchers,
 } = require("../db/syncIngestionQueries");
@@ -273,5 +277,38 @@ describe("POST /api/v1/sync/vouchers", () => {
 
     expect(response.status).toBe(422);
     expect(response.body.unknownExternalCompanyIds).toEqual(["3", "9"]);
+  });
+});
+
+describe("DELETE synchronized records", () => {
+  it.each([
+    ["bills", deleteBills],
+    ["vouchers", deletePaymentVouchers],
+  ])("deletes exact authenticated %s", async (path, deleteRecords) => {
+    deleteRecords.mockResolvedValue({ count: 1 });
+    const response = await request(app)
+      .delete(`/api/v1/sync/${path}`)
+      .set("Authorization", "Bearer sync_abc.secret")
+      .send([{ financialYear: "2025-2026", compNo: 1, entryId: 100 }]);
+
+    expect(response.status).toBe(200);
+    expect(response.body.count).toBe(1);
+    expect(deleteRecords).toHaveBeenCalledWith({
+      companyId: "account_1",
+      syncSourceId: "source_1",
+      records: [
+        { financialYear: "2025-2026", compNo: "1", entryId: "100" },
+      ],
+    });
+  });
+
+  it("rejects a deletion without its financial year", async () => {
+    const response = await request(app)
+      .delete("/api/v1/sync/bills")
+      .set("Authorization", "Bearer sync_abc.secret")
+      .send([{ compNo: 1, entryId: 100 }]);
+
+    expect(response.status).toBe(400);
+    expect(deleteBills).not.toHaveBeenCalled();
   });
 });

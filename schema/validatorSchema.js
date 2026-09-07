@@ -216,15 +216,18 @@ const nullableDateSchema = z.preprocess(
   z.coerce.date().nullable(),
 );
 
-const financialYearSchema = z
+const financialYearValueSchema = z
   .string()
   .trim()
   .regex(/^\d{4}-\d{4}$/, "Financial year must use YYYY-YYYY format")
   .refine((value) => {
     const [fromYear, toYear] = value.split("-").map(Number);
     return toYear === fromYear + 1;
-  }, "Financial year must contain consecutive years")
-  .default(getCurrentFinancialYear);
+  }, "Financial year must contain consecutive years");
+
+const financialYearSchema = financialYearValueSchema.default(
+  getCurrentFinancialYear,
+);
 
 const accountingCompanyIdsSchema = z.preprocess(
   (value) => {
@@ -395,6 +398,19 @@ const syncVouchersSchema = synchronizedRecordBatchSchema(
   "voucher",
 );
 
+const synchronizedDeleteRecordSchema = z
+  .object({
+    financialYear: financialYearValueSchema,
+    entryId: externalRecordIdSchema("Entry ID"),
+    compNo: externalRecordIdSchema("Company number"),
+  })
+  .strict();
+
+const syncRecordDeletionsSchema = synchronizedRecordBatchSchema(
+  synchronizedDeleteRecordSchema,
+  "record deletion",
+);
+
 const partyDetailsSchema = z.object({
   query: z.object({
     financialYear: financialYearSchema,
@@ -430,6 +446,7 @@ module.exports = {
   syncCompaniesSchema,
   syncBillsSchema,
   syncVouchersSchema,
+  syncRecordDeletionsSchema,
   reportPeriodSchema,
   partyDetailsSchema,
   itemDetailsSchema,
