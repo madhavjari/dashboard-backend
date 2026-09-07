@@ -37,6 +37,13 @@ const validBill = {
   cgst: 90,
   sgst: 90,
   igst: 0,
+  returnAdjustments: [
+    {
+      entryId: 900,
+      returnEntryId: 500,
+      adjustedAmount: 7004,
+    },
+  ],
   items: [
     {
       serial: "1",
@@ -142,6 +149,13 @@ describe("POST /api/v1/sync/bills", () => {
           entryId: "100",
           compNo: "1",
           date: new Date("2026-08-20T00:00:00.000Z"),
+          returnAdjustments: [
+            expect.objectContaining({
+              entryId: "900",
+              returnEntryId: "500",
+              adjustedAmount: 7004,
+            }),
+          ],
         }),
         expect.objectContaining({
           entryId: "101",

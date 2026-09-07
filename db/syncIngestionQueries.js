@@ -97,6 +97,16 @@ function mapBillItem(item, { companyId, billEntryId }) {
   };
 }
 
+function mapBillReturnAdjustment(adjustment, { companyId, billEntryId }) {
+  return {
+    companyId,
+    billEntryId,
+    sourceEntryId: adjustment.entryId,
+    returnBillEntryId: adjustment.returnEntryId,
+    adjustedAmount: decimalOrZero(adjustment.adjustedAmount),
+  };
+}
+
 function mapVoucherData(voucher, accountingCompanyId) {
   return {
     accountingCompanyId,
@@ -189,6 +199,25 @@ async function ingestBills({ companyId, syncSourceId, bills }) {
           await tx.billItem.createMany({
             data: bill.items.map((item) =>
               mapBillItem(item, {
+                companyId,
+                billEntryId: storedBill.id,
+              }),
+            ),
+          });
+        }
+
+        await tx.billReturnAdjustment.deleteMany({
+          where: {
+            companyId,
+            billEntryId: storedBill.id,
+          },
+        });
+
+        const returnAdjustments = bill.returnAdjustments ?? [];
+        if (returnAdjustments.length > 0) {
+          await tx.billReturnAdjustment.createMany({
+            data: returnAdjustments.map((adjustment) =>
+              mapBillReturnAdjustment(adjustment, {
                 companyId,
                 billEntryId: storedBill.id,
               }),

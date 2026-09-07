@@ -21,6 +21,10 @@ beforeEach(() => {
       deleteMany: jest.fn(),
       createMany: jest.fn(),
     },
+    billReturnAdjustment: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+    },
     paymentVoucher: { upsert: jest.fn() },
     paymentAllocation: {
       deleteMany: jest.fn(),
@@ -108,12 +112,27 @@ describe("ingestBills", () => {
     tx.billEntry.upsert.mockResolvedValue({ id: 11n });
     tx.billItem.deleteMany.mockResolvedValue({ count: 1 });
     tx.billItem.createMany.mockResolvedValue({ count: 1 });
+    tx.billReturnAdjustment.deleteMany.mockResolvedValue({ count: 1 });
+    tx.billReturnAdjustment.createMany.mockResolvedValue({ count: 1 });
     tx.syncSource.update.mockResolvedValue({ id: "source_1" });
+
+    const billsWithReturnAdjustment = [
+      {
+        ...bills[0],
+        returnAdjustments: [
+          {
+            entryId: "900",
+            returnEntryId: "500",
+            adjustedAmount: 7004,
+          },
+        ],
+      },
+    ];
 
     const result = await ingestBills({
       companyId: "account_1",
       syncSourceId: "source_1",
-      bills,
+      bills: billsWithReturnAdjustment,
     });
 
     expect(result).toEqual({
@@ -168,6 +187,23 @@ describe("ingestBills", () => {
     expect(tx.billItem.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
       tx.billItem.createMany.mock.invocationCallOrder[0],
     );
+    expect(tx.billReturnAdjustment.deleteMany).toHaveBeenCalledWith({
+      where: {
+        companyId: "account_1",
+        billEntryId: 11n,
+      },
+    });
+    expect(tx.billReturnAdjustment.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          companyId: "account_1",
+          billEntryId: 11n,
+          sourceEntryId: "900",
+          returnBillEntryId: "500",
+          adjustedAmount: 7004,
+        },
+      ],
+    });
     expect(tx.syncSource.update).toHaveBeenCalledWith({
       where: {
         companyId_id: {

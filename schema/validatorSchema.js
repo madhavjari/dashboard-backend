@@ -286,6 +286,14 @@ const billItemSchema = z
   })
   .strict();
 
+const billReturnAdjustmentSchema = z
+  .object({
+    entryId: externalRecordIdSchema("Return adjustment entry ID"),
+    returnEntryId: externalRecordIdSchema("Return bill entry ID"),
+    adjustedAmount: decimalSchema,
+  })
+  .strict();
+
 const billSchema = z
   .object({
     financialYear: financialYearSchema,
@@ -308,6 +316,10 @@ const billSchema = z
     modifyDate: nullableDateSchema,
     modifyTime: nullableTextSchema(50),
     items: z.array(billItemSchema).max(1_000).default([]),
+    returnAdjustments: z
+      .array(billReturnAdjustmentSchema)
+      .max(1_000)
+      .default([]),
   })
   .strict();
 
