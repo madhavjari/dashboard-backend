@@ -203,6 +203,7 @@ model BillEntry {
   @@index([companyId, party])
   @@index([companyId, accountingCompanyId, billDate])
   @@index([companyId, financialYear, isOpening])
+  @@index([companyId, entryId, billNo])
 }
 
 model BillReturnAdjustment {

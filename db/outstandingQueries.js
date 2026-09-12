@@ -14,10 +14,17 @@ function createAccountingCompanyKey(
   ownerCompanyId,
 ) {
   const companyId = ownerCompanyId || accountingCompany?.companyId;
+  const syncSourceId = accountingCompany?.syncSourceId;
   const name = String(accountingCompany?.name ?? "")
     .trim()
     .replace(/\s+/g, " ")
     .toLocaleUpperCase();
+
+  if (companyId && syncSourceId && name) {
+    // Accounting-company IDs can change after an annual rollover. The source
+    // plus normalized name remains stable without crossing sync computers.
+    return JSON.stringify([companyId, syncSourceId, name]);
+  }
 
   if (companyId && name) {
     return JSON.stringify([companyId, name]);
@@ -27,19 +34,12 @@ function createAccountingCompanyKey(
 }
 
 async function findBillEntries(reportContext, codes, financialYear) {
-  const accountingCompanyWhere =
-    createAccountingCompanyWhere(reportContext);
   const rows = await prisma.billEntry.findMany({
     where: {
       ...createCompanyWhere(reportContext),
+      ...createAccountingCompanyWhere(reportContext),
+      financialYear,
       code: { in: codes },
-      OR: [
-        { financialYear, ...accountingCompanyWhere },
-        // A return created after rollover is linked to the opening copy of
-        // the original bill in the later yearly database. Fetch that copy so
-        // its return link can be reconciled with the selected-year invoice.
-        { financialYear: { gt: financialYear }, isOpening: true },
-      ],
     },
     select: {
       companyId: true,
@@ -108,12 +108,80 @@ async function findBillEntries(reportContext, codes, financialYear) {
   }));
 }
 
+async function findRelatedBillEntries(
+  reportContext,
+  codes,
+  financialYear,
+  billEntrySourceIds,
+  billNumbers,
+) {
+  const sourceIds = [
+    ...new Set(billEntrySourceIds.filter(Boolean).map(String)),
+  ];
+  const normalizedBillNumbers = [
+    ...new Set(billNumbers.filter(Boolean).map(String)),
+  ];
+  if (sourceIds.length === 0 || normalizedBillNumbers.length === 0) return [];
+
+  const rows = await prisma.billEntry.findMany({
+    where: {
+      ...createCompanyWhere(reportContext),
+      // Do not apply the selected accountingCompanyId here: each annual
+      // database can register the same company under a different ID.
+      financialYear: { not: financialYear },
+      code: { in: codes },
+      entryId: { in: sourceIds },
+      billNo: { in: normalizedBillNumbers },
+      returnAdjustments: { some: {} },
+    },
+    select: {
+      companyId: true,
+      accountingCompanyId: true,
+      accountingCompany: {
+        select: { syncSourceId: true, name: true },
+      },
+      financialYear: true,
+      isOpening: true,
+      entryId: true,
+      code: true,
+      billNo: true,
+      party: true,
+      returnAdjustments: {
+        select: {
+          sourceEntryId: true,
+          returnBillEntryId: true,
+          adjustedAmount: true,
+        },
+      },
+    },
+  });
+
+  return rows.map((row) => ({
+    accounting_company_id: row.accountingCompanyId,
+    accounting_company_key: createAccountingCompanyKey(
+      row.accountingCompany,
+      row.accountingCompanyId,
+      row.companyId,
+    ),
+    financial_year: row.financialYear,
+    is_opening: row.isOpening,
+    bill_entry_source_id: row.entryId,
+    code: row.code,
+    bill_no: row.billNo,
+    party: row.party,
+    return_adjustments: (row.returnAdjustments ?? []).map((adjustment) => ({
+      source_entry_id: adjustment.sourceEntryId,
+      return_bill_entry_source_id: adjustment.returnBillEntryId,
+      adjusted_amount: adjustment.adjustedAmount,
+    })),
+  }));
+}
+
 async function findPaymentAllocations(
   reportContext,
   codes,
   billEntrySourceIds,
   billNumbers,
-  financialYear,
 ) {
   const sourceIds = [
     ...new Set(billEntrySourceIds.filter(Boolean).map(String)),
@@ -130,28 +198,18 @@ async function findPaymentAllocations(
       billNo: { in: legacyBillNumbers },
     });
   }
+  if (linkFilters.length === 0) return [];
 
   const rows = await prisma.paymentAllocation.findMany({
     where: {
       ...createCompanyWhere(reportContext),
       code: { in: codes },
       OR: linkFilters,
-      paymentVoucher: {
-        // A bill can be settled in a later financial year, but a voucher from
-        // an earlier year cannot belong to the selected-year bill. Excluding
-        // earlier vouchers also prevents reused source IDs and bill numbers
-        // from being counted against the wrong invoice.
-        financialYear: { gte: financialYear },
-        // Opening vouchers in the selected year represent payments already
-        // carried into that year's opening balance and must be applied. An
-        // opening voucher in a later year is a carried copy of state already
-        // counted in an earlier year, so only real vouchers are taken later.
-        OR: [{ financialYear }, { isOpening: false }],
-      },
     },
     select: {
       billNo: true,
       billEntrySourceId: true,
+      allocationDate: true,
       adjustedAmount: true,
       unadjustedAmount: true,
       balanceAmount: true,
@@ -159,11 +217,18 @@ async function findPaymentAllocations(
         select: {
           companyId: true,
           accountingCompanyId: true,
+          financialYear: true,
+          isOpening: true,
+          entryId: true,
           accountingCompany: {
             select: { syncSourceId: true, name: true },
           },
+          voucherDate: true,
           mode: true,
           party: true,
+          slipNo: true,
+          referenceNo: true,
+          chequeNo: true,
           chequeDate: true,
           clearingDate: true,
           netAmount: true,
@@ -181,12 +246,20 @@ async function findPaymentAllocations(
     ),
     bill_entry_source_id: row.billEntrySourceId,
     bill_no: row.billNo,
+    allocation_date: row.allocationDate,
     adjust_amt: row.adjustedAmount,
     unadj_amt: row.unadjustedAmount,
     bal_amt: row.balanceAmount,
     payment_vouchers: {
+      financial_year: row.paymentVoucher.financialYear,
+      is_opening: row.paymentVoucher.isOpening,
+      source_entry_id: row.paymentVoucher.entryId,
+      voucher_date: row.paymentVoucher.voucherDate,
       mode: row.paymentVoucher.mode,
       party: row.paymentVoucher.party,
+      slip_no: row.paymentVoucher.slipNo,
+      reference_no: row.paymentVoucher.referenceNo,
+      cheque_no: row.paymentVoucher.chequeNo,
       cheque_date: row.paymentVoucher.chequeDate,
       clearing_date: row.paymentVoucher.clearingDate,
       net_amount: row.paymentVoucher.netAmount,
@@ -194,4 +267,8 @@ async function findPaymentAllocations(
   }));
 }
 
-module.exports = { findBillEntries, findPaymentAllocations };
+module.exports = {
+  findBillEntries,
+  findRelatedBillEntries,
+  findPaymentAllocations,
+};

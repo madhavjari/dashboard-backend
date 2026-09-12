@@ -52,29 +52,38 @@ function getAccountingCompanyKey(record) {
 }
 
 function getReturnAdjustmentKey(adjustment) {
+  // The adjustment row ID can change when it is copied to another yearly
+  // database; the linked return and amount describe the stable allocation.
   return JSON.stringify([
-    String(adjustment.source_entry_id ?? "").trim(),
     String(adjustment.return_bill_entry_source_id ?? "").trim(),
+    toNumber(adjustment.adjusted_amount).toFixed(2),
   ]);
 }
 
-function mergeCarriedReturnAdjustments(entries, financialYear, returnCodes) {
-  const reportEntries = [];
-  const carriedEntries = [];
+function createBillEntryNumberPartyKey(
+  accountingCompanyId,
+  billEntrySourceId,
+  billNo,
+  party,
+) {
+  return JSON.stringify([
+    createBillEntryNumberKey(
+      accountingCompanyId,
+      billEntrySourceId,
+      billNo,
+    ),
+    String(party ?? "").trim().toUpperCase(),
+  ]);
+}
 
-  for (const entry of entries) {
-    if (!entry.financial_year || entry.financial_year === financialYear) {
-      reportEntries.push({
-        ...entry,
-        return_adjustments: [...(entry.return_adjustments ?? [])],
-      });
-    } else if (entry.is_opening === true) {
-      carriedEntries.push(entry);
-    }
-  }
+function mergeRelatedReturnAdjustments(entries, relatedEntries, returnCodes) {
+  const reportEntries = entries.map((entry) => ({
+    ...entry,
+    return_adjustments: [...(entry.return_adjustments ?? [])],
+  }));
 
-  const entriesBySourceId = new Map();
   const entriesBySourceAndNumber = new Map();
+  const entriesBySourceNumberAndParty = new Map();
   const adjustmentKeysByEntry = new Map();
 
   for (const entry of reportEntries) {
@@ -82,20 +91,21 @@ function mergeCarriedReturnAdjustments(entries, financialYear, returnCodes) {
     if (!hasSourceId(entry.bill_entry_source_id)) continue;
 
     const companyKey = getAccountingCompanyKey(entry);
-    const sourceKey = createBillEntryKey(
-      companyKey,
-      entry.bill_entry_source_id,
-    );
-    const sourceEntries = entriesBySourceId.get(sourceKey) || [];
-    sourceEntries.push(entry);
-    entriesBySourceId.set(sourceKey, sourceEntries);
-
     if (hasSourceId(entry.bill_no)) {
-      entriesBySourceAndNumber.set(
-        createBillEntryNumberKey(
+      const sourceAndNumberKey = createBillEntryNumberKey(
+        companyKey,
+        entry.bill_entry_source_id,
+        entry.bill_no,
+      );
+      const matches = entriesBySourceAndNumber.get(sourceAndNumberKey) || [];
+      matches.push(entry);
+      entriesBySourceAndNumber.set(sourceAndNumberKey, matches);
+      entriesBySourceNumberAndParty.set(
+        createBillEntryNumberPartyKey(
           companyKey,
           entry.bill_entry_source_id,
           entry.bill_no,
+          entry.party,
         ),
         entry,
       );
@@ -107,30 +117,34 @@ function mergeCarriedReturnAdjustments(entries, financialYear, returnCodes) {
     );
   }
 
-  for (const carriedEntry of carriedEntries) {
-    if (returnCodes.includes(carriedEntry.code)) continue;
-    if (!hasSourceId(carriedEntry.bill_entry_source_id)) continue;
+  for (const relatedEntry of relatedEntries) {
+    if (returnCodes.includes(relatedEntry.code)) continue;
+    if (!hasSourceId(relatedEntry.bill_entry_source_id)) continue;
 
-    const companyKey = getAccountingCompanyKey(carriedEntry);
-    let targetEntry;
-    if (hasSourceId(carriedEntry.bill_no)) {
-      targetEntry = entriesBySourceAndNumber.get(
+    const companyKey = getAccountingCompanyKey(relatedEntry);
+    if (!hasSourceId(relatedEntry.bill_no)) continue;
+    let targetEntry = entriesBySourceNumberAndParty.get(
+      createBillEntryNumberPartyKey(
+        companyKey,
+        relatedEntry.bill_entry_source_id,
+        relatedEntry.bill_no,
+        relatedEntry.party,
+      ),
+    );
+    if (!targetEntry) {
+      const matches = entriesBySourceAndNumber.get(
         createBillEntryNumberKey(
           companyKey,
-          carriedEntry.bill_entry_source_id,
-          carriedEntry.bill_no,
+          relatedEntry.bill_entry_source_id,
+          relatedEntry.bill_no,
         ),
       );
-    } else {
-      const sourceMatches = entriesBySourceId.get(
-        createBillEntryKey(companyKey, carriedEntry.bill_entry_source_id),
-      );
-      if (sourceMatches?.length === 1) targetEntry = sourceMatches[0];
+      if (matches?.length === 1) targetEntry = matches[0];
     }
     if (!targetEntry) continue;
 
     const adjustmentKeys = adjustmentKeysByEntry.get(targetEntry);
-    for (const adjustment of carriedEntry.return_adjustments ?? []) {
+    for (const adjustment of relatedEntry.return_adjustments ?? []) {
       const adjustmentKey = getReturnAdjustmentKey(adjustment);
       if (adjustmentKeys.has(adjustmentKey)) continue;
       adjustmentKeys.add(adjustmentKey);
@@ -139,6 +153,103 @@ function mergeCarriedReturnAdjustments(entries, financialYear, returnCodes) {
   }
 
   return reportEntries;
+}
+
+function normalizeFingerprintValue(value) {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+function dateFingerprint(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function createPaymentFingerprint(allocation) {
+  const payment = allocation.payment_vouchers ?? {};
+  const paymentDate = dateFingerprint(
+    payment.voucher_date ||
+      allocation.allocation_date ||
+      payment.clearing_date ||
+      payment.cheque_date,
+  );
+  const paymentAmount = toNumber(payment.net_amount);
+  if (!paymentDate || paymentAmount === 0) return null;
+
+  // Opening vouchers are annual snapshots and do not retain a stable voucher
+  // ID, so reconcile them using the accounting attributes that survive copy.
+  return JSON.stringify([
+    paymentDate,
+    paymentAmount.toFixed(2),
+    toNumber(allocation.adjust_amt).toFixed(2),
+    normalizeFingerprintValue(payment.party),
+    normalizeFingerprintValue(payment.mode),
+    normalizeFingerprintValue(payment.cheque_no),
+    normalizeFingerprintValue(payment.reference_no),
+    normalizeFingerprintValue(payment.slip_no),
+  ]);
+}
+
+function reconcilePaymentAllocations(
+  allocations,
+  reconciliationContext,
+  financialYear,
+) {
+  const eligibleAllocations = allocations.filter((allocation) => {
+    const allocationYear = allocation.payment_vouchers?.financial_year;
+    return (
+      reconciliationContext.isOpening === true ||
+      !allocationYear ||
+      allocationYear >= financialYear
+    );
+  });
+  const groups = new Map();
+  const ungrouped = [];
+
+  for (const allocation of eligibleAllocations) {
+    const fingerprint = createPaymentFingerprint(allocation);
+    if (!fingerprint) {
+      ungrouped.push(allocation);
+      continue;
+    }
+
+    const group = groups.get(fingerprint) || {
+      ordinary: [],
+      openingByYear: new Map(),
+    };
+    if (allocation.payment_vouchers?.is_opening === true) {
+      const year = allocation.payment_vouchers.financial_year || "";
+      const opening = group.openingByYear.get(year) || [];
+      opening.push(allocation);
+      group.openingByYear.set(year, opening);
+    } else {
+      group.ordinary.push(allocation);
+    }
+    groups.set(fingerprint, group);
+  }
+
+  const reconciled = [...ungrouped];
+  for (const group of groups.values()) {
+    reconciled.push(...group.ordinary);
+    // Repeated opening rows across years describe the same carried state. Keep
+    // only the largest yearly multiplicity, minus matching original payments.
+    const largestOpeningGroup = [...group.openingByYear.values()].reduce(
+      (largest, opening) =>
+        opening.length > largest.length ? opening : largest,
+      [],
+    );
+    const openingOnlyCount = Math.max(
+      0,
+      largestOpeningGroup.length - group.ordinary.length,
+    );
+    reconciled.push(...largestOpeningGroup.slice(0, openingOnlyCount));
+  }
+
+  return reconciled.sort((left, right) => {
+    const leftDate = createPaymentFingerprint(left) || "";
+    const rightDate = createPaymentFingerprint(right) || "";
+    return leftDate.localeCompare(rightDate);
+  });
 }
 
 function getPaymentDays(billDate, payment) {
@@ -234,7 +345,7 @@ function createPartySummary(party, type) {
   };
 }
 
-function buildOutstandingReport(entries, allocations, options) {
+function buildOutstandingReport(entries, allocations, options, financialYear) {
   const {
     transactionCodes,
     returnCodes,
@@ -248,6 +359,8 @@ function buildOutstandingReport(entries, allocations, options) {
   const entriesBySourceId = new Map();
   const entriesBySourceAndNumber = new Map();
   const entriesByBillAndParty = new Map();
+  const allocationsByEntry = new Map();
+  const reconciliationContextByEntry = new Map();
   const returnTotalsByParty = new Map();
   const unallocatedReturnsByParty = new Map();
   const appliedReturnsBySourceId = new Map();
@@ -300,6 +413,9 @@ function buildOutstandingReport(entries, allocations, options) {
 
     const outstandingEntry = createOutstandingEntry(entry, outstandingField);
     outstandingEntries.push(outstandingEntry);
+    reconciliationContextByEntry.set(outstandingEntry, {
+      isOpening: entry.is_opening === true,
+    });
 
     if (hasSourceId(entry.bill_entry_source_id)) {
       const sourceKey = createBillEntryKey(
@@ -360,7 +476,22 @@ function buildOutstandingReport(entries, allocations, options) {
       if (legacyMatches?.length === 1) entry = legacyMatches[0];
     }
 
-    if (entry) addAllocation(entry, allocation, outstandingField);
+    if (entry) {
+      const matchedAllocations = allocationsByEntry.get(entry) || [];
+      matchedAllocations.push(allocation);
+      allocationsByEntry.set(entry, matchedAllocations);
+    }
+  }
+
+  for (const entry of outstandingEntries) {
+    const reconciledAllocations = reconcilePaymentAllocations(
+      allocationsByEntry.get(entry) || [],
+      reconciliationContextByEntry.get(entry),
+      financialYear,
+    );
+    for (const allocation of reconciledAllocations) {
+      addAllocation(entry, allocation, outstandingField);
+    }
   }
 
   const data = outstandingEntries;
@@ -424,15 +555,10 @@ function buildOutstandingReport(entries, allocations, options) {
 }
 
 async function getOutstandingReport(reportContext, options, financialYear) {
-  const fetchedEntries = await outstandingQueries.findBillEntries(
+  const entries = await outstandingQueries.findBillEntries(
     reportContext,
     [...options.transactionCodes, ...options.returnCodes],
     financialYear,
-  );
-  const entries = mergeCarriedReturnAdjustments(
-    fetchedEntries,
-    financialYear,
-    options.returnCodes,
   );
   const billEntries = entries.filter(
     (entry) => !options.returnCodes.includes(entry.code) && entry.bill_no,
@@ -446,18 +572,36 @@ async function getOutstandingReport(reportContext, options, financialYear) {
     ),
   ];
   const billNumbers = [...new Set(billEntries.map((entry) => entry.bill_no))];
-  const allocations =
+  const [relatedEntries, allocations] =
     billEntrySourceIds.length === 0 && billNumbers.length === 0
-      ? []
-      : await outstandingQueries.findPaymentAllocations(
-          reportContext,
-          options.paymentCode,
-          billEntrySourceIds,
-          billNumbers,
-          financialYear,
-        );
+      ? [[], []]
+      : await Promise.all([
+          outstandingQueries.findRelatedBillEntries(
+            reportContext,
+            options.transactionCodes,
+            financialYear,
+            billEntrySourceIds,
+            billNumbers,
+          ),
+          outstandingQueries.findPaymentAllocations(
+            reportContext,
+            options.paymentCode,
+            billEntrySourceIds,
+            billNumbers,
+          ),
+        ]);
+  const reconciledEntries = mergeRelatedReturnAdjustments(
+    entries,
+    relatedEntries,
+    options.returnCodes,
+  );
 
-  return buildOutstandingReport(entries, allocations, options);
+  return buildOutstandingReport(
+    reconciledEntries,
+    allocations,
+    options,
+    financialYear,
+  );
 }
 
 async function getSales(

@@ -1,5 +1,6 @@
 jest.mock("../../db/outstandingQueries", () => ({
   findBillEntries: jest.fn(),
+  findRelatedBillEntries: jest.fn(),
   findPaymentAllocations: jest.fn(),
 }));
 
@@ -10,6 +11,7 @@ const { DEFAULT_FINANCIAL_YEAR } = require("../../utils/financialYear");
 describe("outstandingService.getSales", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    outstandingQueries.findRelatedBillEntries.mockResolvedValue([]);
   });
 
   test("subtracts BR allocation adjustments from each sales bill", async () => {
@@ -82,7 +84,6 @@ describe("outstandingService.getSales", () => {
       ["BR", "CR"],
       [],
       ["S-100", "S-101"],
-      DEFAULT_FINANCIAL_YEAR,
     );
   });
 
@@ -103,6 +104,7 @@ describe("outstandingService.getSales", () => {
       data: [],
       partySummary: [],
     });
+    expect(outstandingQueries.findRelatedBillEntries).not.toHaveBeenCalled();
     expect(outstandingQueries.findPaymentAllocations).not.toHaveBeenCalled();
   });
 
@@ -297,6 +299,8 @@ describe("outstandingService.getSales", () => {
         net_amount: "1000.00",
         return_adjustments: [],
       },
+    ]);
+    outstandingQueries.findRelatedBillEntries.mockResolvedValue([
       {
         accounting_company_id: "books-2026",
         accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
@@ -310,7 +314,7 @@ describe("outstandingService.getSales", () => {
         net_amount: "1000.00",
         return_adjustments: [
           {
-            source_entry_id: "500",
+            source_entry_id: "501",
             return_bill_entry_source_id: "900",
             adjusted_amount: "250.00",
           },
@@ -352,6 +356,228 @@ describe("outstandingService.getSales", () => {
         amountToCollect: 750,
         overpaidAmount: 0,
       }),
+    );
+  });
+
+  test("reconciles a prior-year return into a carried opening sales bill", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-2026",
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        financial_year: "2026-2027",
+        is_opening: true,
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2026-04-01"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+        return_adjustments: [],
+      },
+    ]);
+    outstandingQueries.findRelatedBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-2025",
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        financial_year: "2025-2026",
+        is_opening: false,
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        party: "ACME TEXTILES",
+        return_adjustments: [
+          {
+            source_entry_id: "500",
+            return_bill_entry_source_id: "900",
+            adjusted_amount: "250.00",
+          },
+        ],
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([]);
+
+    const report = await getSales(
+      { mode: "authenticated", companyIds: ["company-1"] },
+      { financialYear: "2026-2027" },
+    );
+
+    expect(report.data).toEqual([
+      expect.objectContaining({
+        billEntrySourceId: "100",
+        billAdjustmentAmount: 250,
+        adjustedAmount: 250,
+        amountToCollect: 750,
+        overpaidAmount: 0,
+      }),
+    ]);
+  });
+
+  test("deduplicates a carried opening payment while retaining split original payments", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-2026",
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        financial_year: "2026-2027",
+        is_opening: true,
+        bill_entry_source_id: "7361",
+        code: "S",
+        bill_no: "113",
+        bill_date: new Date("2025-08-21"),
+        party: "KRISH FASHION",
+        net_amount: "89493.00",
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
+      {
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        bill_entry_source_id: "7361",
+        bill_no: "113",
+        adjust_amt: "44493.00",
+        unadj_amt: "0.00",
+        bal_amt: "45000.00",
+        allocation_date: new Date("2026-02-23"),
+        payment_vouchers: {
+          financial_year: "2025-2026",
+          is_opening: false,
+          voucher_date: new Date("2026-02-23"),
+          mode: "CHQ",
+          party: "KRISH FASHION",
+          net_amount: "44493.00",
+        },
+      },
+      {
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        bill_entry_source_id: "7361",
+        bill_no: "113",
+        adjust_amt: "45000.00",
+        unadj_amt: "0.00",
+        bal_amt: "0.00",
+        allocation_date: new Date("2026-03-18"),
+        payment_vouchers: {
+          financial_year: "2025-2026",
+          is_opening: false,
+          voucher_date: new Date("2026-03-18"),
+          mode: "CHQ",
+          party: "KRISH FASHION",
+          net_amount: "45000.00",
+        },
+      },
+      {
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        bill_entry_source_id: "7361",
+        bill_no: "113",
+        adjust_amt: "45000.00",
+        unadj_amt: "0.00",
+        bal_amt: "0.00",
+        allocation_date: new Date("2026-03-18"),
+        payment_vouchers: {
+          financial_year: "2026-2027",
+          is_opening: true,
+          voucher_date: new Date("2026-03-18"),
+          mode: "CHQ",
+          party: "KRISH FASHION",
+          net_amount: "45000.00",
+        },
+      },
+    ]);
+
+    const report = await getSales(
+      { mode: "authenticated", companyIds: ["company-1"] },
+      { financialYear: "2026-2027" },
+    );
+
+    expect(report.data[0]).toEqual(
+      expect.objectContaining({
+        billEntrySourceId: "7361",
+        adjustedAmount: 89493,
+        amountToCollect: 0,
+        overpaidAmount: 0,
+      }),
+    );
+    expect(report.data[0].payments).toHaveLength(2);
+  });
+
+  test("keeps an opening-only payment when no original allocation exists", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-2026",
+        financial_year: "2026-2027",
+        is_opening: true,
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2025-08-21"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
+      {
+        accounting_company_id: "books-2026",
+        bill_entry_source_id: "100",
+        bill_no: "S-1",
+        adjust_amt: "600.00",
+        unadj_amt: "0.00",
+        bal_amt: "400.00",
+        allocation_date: new Date("2026-04-01"),
+        payment_vouchers: {
+          financial_year: "2026-2027",
+          is_opening: true,
+          voucher_date: new Date("2026-04-01"),
+          mode: "OPENING",
+          party: "ACME TEXTILES",
+          net_amount: "600.00",
+        },
+      },
+    ]);
+
+    const report = await getSales(undefined, {
+      financialYear: "2026-2027",
+    });
+
+    expect(report.data[0]).toEqual(
+      expect.objectContaining({ adjustedAmount: 600, amountToCollect: 400 }),
+    );
+  });
+
+  test("ignores earlier-year allocations for a non-opening bill", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-2026",
+        financial_year: "2026-2027",
+        is_opening: false,
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2026-04-05"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
+      {
+        accounting_company_id: "books-2026",
+        bill_entry_source_id: "100",
+        bill_no: "S-1",
+        adjust_amt: "1000.00",
+        allocation_date: new Date("2026-03-20"),
+        payment_vouchers: {
+          financial_year: "2025-2026",
+          is_opening: false,
+          voucher_date: new Date("2026-03-20"),
+          mode: "CHQ",
+          party: "ACME TEXTILES",
+          net_amount: "1000.00",
+        },
+      },
+    ]);
+
+    const report = await getSales(undefined, {
+      financialYear: "2026-2027",
+    });
+
+    expect(report.data[0]).toEqual(
+      expect.objectContaining({ adjustedAmount: 0, amountToCollect: 1000 }),
     );
   });
 
@@ -424,6 +650,7 @@ describe("outstandingService.getSales", () => {
 describe("outstandingService.getPurchases", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    outstandingQueries.findRelatedBillEntries.mockResolvedValue([]);
   });
 
   test("subtracts BP allocation adjustments from each purchase bill", async () => {
@@ -480,7 +707,6 @@ describe("outstandingService.getPurchases", () => {
       ["BP", "CP"],
       [],
       ["P-100"],
-      DEFAULT_FINANCIAL_YEAR,
     );
   });
 
@@ -520,6 +746,7 @@ describe("outstandingService.getPurchases", () => {
 describe("outstanding accounting-company isolation", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    outstandingQueries.findRelatedBillEntries.mockResolvedValue([]);
   });
 
   it("does not apply an allocation from another accounting company", async () => {

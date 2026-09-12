@@ -156,13 +156,21 @@ async function getItemWiseSummary(
   };
 }
 
-async function getKPI(reportContext, fromDate, toDate, billCodes, returnCodes) {
+async function getKPI(
+  reportContext,
+  fromDate,
+  toDate,
+  billCodes,
+  returnCodes,
+  financialYear,
+) {
   const { bills, returns } = await reportQueries.findKpiData(
     reportContext,
     fromDate,
     toDate,
     billCodes,
     returnCodes,
+    financialYear,
   );
   const grossAmount = toNumber(bills._sum.net_amount);
   const returnAmount = toNumber(returns._sum.net_amount);

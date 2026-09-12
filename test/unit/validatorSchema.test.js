@@ -507,6 +507,44 @@ describe("itemDetailsSchema", () => {
 });
 
 describe("reportPeriodSchema", () => {
+  test("accepts a complete custom range inside the financial year", async () => {
+    const result = await reportPeriodSchema.safeParseAsync({
+      query: {
+        financialYear: "2025-2026",
+        fromDate: "2025-08-01",
+        toDate: "2025-08-31",
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  test.each([
+    {
+      financialYear: "2025-2026",
+      fromDate: "2025-08-01",
+    },
+    {
+      financialYear: "2025-2026",
+      fromDate: "2025-09-01",
+      toDate: "2025-08-31",
+    },
+    {
+      financialYear: "2025-2026",
+      fromDate: "2025-03-31",
+      toDate: "2025-04-30",
+    },
+    {
+      financialYear: "2025-2026",
+      fromDate: "2025-08-01",
+      toDate: "2025-02-30",
+    },
+  ])("rejects invalid custom range %#", async (query) => {
+    const result = await reportPeriodSchema.safeParseAsync({ query });
+
+    expect(result.success).toBe(false);
+  });
+
   test("normalizes a comma-separated accounting-company selection", async () => {
     const firstId = "00000000-0000-4000-8000-000000000201";
     const secondId = "00000000-0000-4000-8000-000000000202";

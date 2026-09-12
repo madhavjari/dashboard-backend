@@ -5,7 +5,10 @@ const {
   getItemWiseSummary,
   getIndividualPartyData,
 } = require("../services/reportService.js");
-const { getFinancialYearPeriod } = require("../utils/financialYear");
+const {
+  getFinancialYearPeriod,
+  getRequestedReportPeriod,
+} = require("../utils/financialYear");
 
 function sendInternalServerError(res, error) {
   console.error(error);
@@ -89,13 +92,14 @@ function createReportController(
   return {
     async getKPISummary(req, res) {
       try {
-        const reportPeriod = getFinancialYearPeriod(req.query?.financialYear);
+        const reportPeriod = getRequestedReportPeriod(req.query);
         const data = await getKPI(
           req.reportContext,
           reportPeriod.fromDate,
           reportPeriod.toDate,
           billCodes,
           returnCodes,
+          reportPeriod.financialYear,
         );
 
         return res.status(200).json({ data });

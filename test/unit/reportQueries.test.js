@@ -63,4 +63,33 @@ describe("reportQueries tenant isolation", () => {
       }),
     );
   });
+
+  it("keeps the selected financial year when filtering a partial date range", async () => {
+    const context = {
+      mode: "authenticated",
+      companyIds: ["company_1"],
+      accountingCompanyIds: ["books_1"],
+    };
+
+    await findKpiData(
+      context,
+      "2025-08-01",
+      "2025-09-01",
+      ["S"],
+      ["SR"],
+      "2025-2026",
+    );
+
+    for (const call of prisma.billEntry.aggregate.mock.calls) {
+      expect(call[0].where).toEqual(
+        expect.objectContaining({
+          financialYear: "2025-2026",
+          billDate: {
+            gte: new Date("2025-08-01"),
+            lt: new Date("2025-09-01"),
+          },
+        }),
+      );
+    }
+  });
 });

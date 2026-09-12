@@ -6,10 +6,47 @@ jest.mock("../../services/reportService.js", () => ({
   getIndividualPartyData: jest.fn(),
 }));
 
-const { getPartyDetails } = require("../../services/reportService.js");
+const { getKPI, getPartyDetails } = require("../../services/reportService.js");
 const {
   createReportController,
 } = require("../../controllers/reportControllerFactory.js");
+
+describe("reportControllerFactory.getKPISummary", () => {
+  test("uses an inclusive custom range within the selected financial year", async () => {
+    getKPI.mockResolvedValue({ netAmount: 900 });
+    const controller = createReportController(["S"], ["SR"], {
+      getOutstandingReport: jest.fn(),
+      outstandingField: "amountToCollect",
+    });
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+
+    await controller.getKPISummary(
+      {
+        reportContext: { companyIds: ["company_1"] },
+        query: {
+          financialYear: "2025-2026",
+          fromDate: "2025-08-01",
+          toDate: "2025-08-31",
+        },
+      },
+      res,
+    );
+
+    expect(getKPI).toHaveBeenCalledWith(
+      { companyIds: ["company_1"] },
+      "2025-08-01",
+      "2025-09-01",
+      ["S"],
+      ["SR"],
+      "2025-2026",
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ data: { netAmount: 900 } });
+  });
+});
 
 describe("reportControllerFactory.getPartyWiseReport", () => {
   test("adds the matching outstanding amount and overall summary", async () => {

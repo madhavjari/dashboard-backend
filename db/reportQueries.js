@@ -7,11 +7,17 @@ const {
 } = require("./reportScope");
 const { financialYearFromPeriod } = require("../utils/financialYear");
 
-function createEntryDateFilter(reportContext, codes, fromDate, toDate) {
+function createEntryDateFilter(
+  reportContext,
+  codes,
+  fromDate,
+  toDate,
+  financialYear,
+) {
   return {
     ...createCompanyWhere(reportContext),
     ...createAccountingCompanyWhere(reportContext),
-    financialYear: financialYearFromPeriod(fromDate, toDate),
+    financialYear: financialYear || financialYearFromPeriod(fromDate, toDate),
     isOpening: false,
     code: { in: codes },
     billDate: {
@@ -151,6 +157,7 @@ async function findKpiData(
   toDate,
   billCodes,
   returnCodes,
+  financialYear,
 ) {
   const [bills, returns] = await Promise.all([
     prisma.billEntry.aggregate({
@@ -159,6 +166,7 @@ async function findKpiData(
         billCodes,
         fromDate,
         toDate,
+        financialYear,
       ),
       _sum: {
         netAmount: true,
@@ -174,6 +182,7 @@ async function findKpiData(
         returnCodes,
         fromDate,
         toDate,
+        financialYear,
       ),
       _sum: {
         netAmount: true,

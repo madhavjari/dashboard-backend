@@ -1,7 +1,10 @@
 const { z } = require("zod");
 
 const { findUser } = require("../db/authQueries");
-const { getCurrentFinancialYear } = require("../utils/financialYear");
+const {
+  getCurrentFinancialYear,
+  getFinancialYearPeriod,
+} = require("../utils/financialYear");
 
 const passwordSchema = z
   .string()
@@ -244,13 +247,63 @@ const accountingCompanyIdsSchema = z.preprocess(
     .optional(),
 );
 
+const reportDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must use YYYY-MM-DD format")
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return (
+      !Number.isNaN(parsed.getTime()) &&
+      parsed.toISOString().slice(0, 10) === value
+    );
+  }, "Date must be a valid calendar date");
+
 const reportPeriodSchema = z.object({
   query: z
     .object({
       financialYear: financialYearSchema,
       accountingCompanyIds: accountingCompanyIdsSchema,
+      fromDate: reportDateSchema.optional(),
+      toDate: reportDateSchema.optional(),
     })
-    .passthrough(),
+    .passthrough()
+    .superRefine((query, context) => {
+      if (Boolean(query.fromDate) !== Boolean(query.toDate)) {
+        context.addIssue({
+          code: "custom",
+          path: [query.fromDate ? "toDate" : "fromDate"],
+          message: "Both fromDate and toDate are required for a custom range",
+        });
+        return;
+      }
+
+      if (!query.fromDate || !query.toDate) return;
+
+      if (query.fromDate > query.toDate) {
+        context.addIssue({
+          code: "custom",
+          path: ["toDate"],
+          message: "toDate must be on or after fromDate",
+        });
+      }
+
+      const financialYearPeriod = getFinancialYearPeriod(query.financialYear);
+      const lastDate = new Date(`${financialYearPeriod.toDate}T00:00:00.000Z`);
+      lastDate.setUTCDate(lastDate.getUTCDate() - 1);
+      const financialYearLastDate = lastDate.toISOString().slice(0, 10);
+
+      if (
+        query.fromDate < financialYearPeriod.fromDate ||
+        query.toDate > financialYearLastDate
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["fromDate"],
+          message: `Custom range must be within financial year ${query.financialYear}`,
+        });
+      }
+    }),
 });
 
 const billItemSchema = z
