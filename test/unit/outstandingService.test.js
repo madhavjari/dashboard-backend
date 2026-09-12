@@ -82,6 +82,7 @@ describe("outstandingService.getSales", () => {
       ["BR", "CR"],
       [],
       ["S-100", "S-101"],
+      DEFAULT_FINANCIAL_YEAR,
     );
   });
 
@@ -158,6 +159,47 @@ describe("outstandingService.getSales", () => {
         adjustedAmount: 500,
       }),
     ]);
+  });
+
+  test("does not apply a source-linked allocation when the voucher party differs", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-1",
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2026-04-05"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([
+      {
+        accounting_company_id: "books-1",
+        bill_entry_source_id: "100",
+        bill_no: "S-1",
+        adjust_amt: "1000.00",
+        unadj_amt: "0.00",
+        bal_amt: "0.00",
+        payment_vouchers: {
+          mode: "BANK",
+          party: "ANOTHER COMPANY",
+          cheque_date: null,
+          clearing_date: null,
+          net_amount: "1000.00",
+        },
+      },
+    ]);
+
+    const report = await getSales();
+
+    expect(report.data[0]).toEqual(
+      expect.objectContaining({
+        adjustedAmount: 0,
+        amountToCollect: 1000,
+        overpaidAmount: 0,
+      }),
+    );
   });
 
   test("matches split allocations when the company CompNo changes between years", async () => {
@@ -406,6 +448,7 @@ describe("outstandingService.getPurchases", () => {
       ["BP", "CP"],
       [],
       ["P-100"],
+      DEFAULT_FINANCIAL_YEAR,
     );
   });
 

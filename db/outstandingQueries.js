@@ -102,6 +102,7 @@ async function findPaymentAllocations(
   codes,
   billEntrySourceIds,
   billNumbers,
+  financialYear,
 ) {
   const sourceIds = [
     ...new Set(billEntrySourceIds.filter(Boolean).map(String)),
@@ -124,6 +125,17 @@ async function findPaymentAllocations(
       ...createCompanyWhere(reportContext),
       code: { in: codes },
       OR: linkFilters,
+      paymentVoucher: {
+        // A bill can be settled in a later financial year, but a voucher from
+        // an earlier year cannot belong to the selected-year bill. Excluding
+        // earlier vouchers also prevents reused source IDs and bill numbers
+        // from being counted against the wrong invoice.
+        financialYear: { gte: financialYear },
+        // Opening vouchers carry the prior database's accounting state into a
+        // new financial year. They are not new receipts/payments and counting
+        // them again would double-adjust the carried opening bill.
+        isOpening: false,
+      },
     },
     select: {
       billNo: true,

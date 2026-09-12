@@ -91,7 +91,7 @@ describe("outstanding financial-year queries", () => {
     );
   });
 
-  test("does not filter allocations by the voucher's accounting company", async () => {
+  test("uses current-or-later non-opening vouchers across accounting company records", async () => {
     await findPaymentAllocations(
       {
         mode: "authenticated",
@@ -101,6 +101,7 @@ describe("outstanding financial-year queries", () => {
       "BR",
       ["100"],
       ["S-1"],
+      "2026-2027",
     );
 
     expect(prisma.paymentAllocation.findMany).toHaveBeenCalledWith(
@@ -110,6 +111,10 @@ describe("outstanding financial-year queries", () => {
             { billEntrySourceId: { in: ["100"] } },
             { billEntrySourceId: null, billNo: { in: ["S-1"] } },
           ],
+          paymentVoucher: {
+            financialYear: { gte: "2026-2027" },
+            isOpening: false,
+          },
         }),
       }),
     );

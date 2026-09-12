@@ -35,11 +35,13 @@ function createBillEntryNumberKey(
   accountingCompanyId,
   billEntrySourceId,
   billNo,
+  party,
 ) {
   return JSON.stringify([
     String(accountingCompanyId || ""),
     String(billEntrySourceId ?? "").trim(),
     String(billNo ?? "").trim().toUpperCase(),
+    String(party ?? "").trim().toUpperCase(),
   ]);
 }
 
@@ -224,6 +226,7 @@ function buildOutstandingReport(entries, allocations, options) {
           getAccountingCompanyKey(entry),
           entry.bill_entry_source_id,
           entry.bill_no,
+          entry.party,
         ),
         outstandingEntry,
       );
@@ -248,6 +251,7 @@ function buildOutstandingReport(entries, allocations, options) {
             getAccountingCompanyKey(allocation),
             allocation.bill_entry_source_id,
             allocation.bill_no,
+            allocation.payment_vouchers.party,
           ),
         );
       } else {
@@ -359,6 +363,7 @@ async function getOutstandingReport(reportContext, options, financialYear) {
           options.paymentCode,
           billEntrySourceIds,
           billNumbers,
+          financialYear,
         );
 
   return buildOutstandingReport(entries, allocations, options);
