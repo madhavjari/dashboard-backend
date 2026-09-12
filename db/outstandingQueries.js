@@ -27,16 +27,25 @@ function createAccountingCompanyKey(
 }
 
 async function findBillEntries(reportContext, codes, financialYear) {
+  const accountingCompanyWhere =
+    createAccountingCompanyWhere(reportContext);
   const rows = await prisma.billEntry.findMany({
     where: {
       ...createCompanyWhere(reportContext),
-      ...createAccountingCompanyWhere(reportContext),
-      financialYear,
       code: { in: codes },
+      OR: [
+        { financialYear, ...accountingCompanyWhere },
+        // A return created after rollover is linked to the opening copy of
+        // the original bill in the later yearly database. Fetch that copy so
+        // its return link can be reconciled with the selected-year invoice.
+        { financialYear: { gt: financialYear }, isOpening: true },
+      ],
     },
     select: {
       companyId: true,
       accountingCompanyId: true,
+      financialYear: true,
+      isOpening: true,
       accountingCompany: {
         select: { syncSourceId: true, name: true },
       },
@@ -73,6 +82,8 @@ async function findBillEntries(reportContext, codes, financialYear) {
       row.accountingCompanyId,
       row.companyId,
     ),
+    financial_year: row.financialYear,
+    is_opening: row.isOpening,
     bill_entry_source_id: row.entryId,
     code: row.code,
     bill_no: row.billNo,

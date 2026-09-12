@@ -33,15 +33,20 @@ describe("outstanding financial-year queries", () => {
       expect.objectContaining({
         where: {
           companyId: "company-1",
-          accountingCompanyId: { in: ["books-1", "books-2"] },
-          financialYear: "2026-2027",
           code: { in: ["S", "SR"] },
+          OR: [
+            {
+              financialYear: "2026-2027",
+              accountingCompanyId: { in: ["books-1", "books-2"] },
+            },
+            {
+              financialYear: { gt: "2026-2027" },
+              isOpening: true,
+            },
+          ],
         },
       }),
     );
-    expect(
-      prisma.billEntry.findMany.mock.calls[0][0].where,
-    ).not.toHaveProperty("isOpening");
   });
 
   test("returns distinct item names for each invoice", async () => {

@@ -282,6 +282,79 @@ describe("outstandingService.getSales", () => {
     ]);
   });
 
+  test("applies a later-year sales return linked through the opening bill copy", async () => {
+    outstandingQueries.findBillEntries.mockResolvedValue([
+      {
+        accounting_company_id: "books-2025",
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        financial_year: "2025-2026",
+        is_opening: false,
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2025-08-05"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+        return_adjustments: [],
+      },
+      {
+        accounting_company_id: "books-2026",
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        financial_year: "2026-2027",
+        is_opening: true,
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2026-04-01"),
+        party: "ACME TEXTILES",
+        net_amount: "1000.00",
+        return_adjustments: [
+          {
+            source_entry_id: "500",
+            return_bill_entry_source_id: "900",
+            adjusted_amount: "250.00",
+          },
+        ],
+      },
+      {
+        accounting_company_id: "books-2027",
+        accounting_company_key: '["company-1","MADHAV ENTERPRISE"]',
+        financial_year: "2027-2028",
+        is_opening: true,
+        bill_entry_source_id: "100",
+        code: "S",
+        bill_no: "S-1",
+        bill_date: new Date("2027-04-01"),
+        party: "ACME TEXTILES",
+        net_amount: "750.00",
+        return_adjustments: [
+          {
+            source_entry_id: "500",
+            return_bill_entry_source_id: "900",
+            adjusted_amount: "250.00",
+          },
+        ],
+      },
+    ]);
+    outstandingQueries.findPaymentAllocations.mockResolvedValue([]);
+
+    const report = await getSales(
+      { mode: "authenticated", companyIds: ["company-1"] },
+      { financialYear: "2025-2026" },
+    );
+
+    expect(report.data).toHaveLength(1);
+    expect(report.data[0]).toEqual(
+      expect.objectContaining({
+        billEntrySourceId: "100",
+        billAdjustmentAmount: 250,
+        adjustedAmount: 250,
+        amountToCollect: 750,
+        overpaidAmount: 0,
+      }),
+    );
+  });
+
   test("subtracts sales returns from the affected party's amount to collect", async () => {
     outstandingQueries.findBillEntries.mockResolvedValue([
       {

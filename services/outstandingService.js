@@ -51,6 +51,96 @@ function getAccountingCompanyKey(record) {
   return record.accounting_company_key ?? record.accounting_company_id;
 }
 
+function getReturnAdjustmentKey(adjustment) {
+  return JSON.stringify([
+    String(adjustment.source_entry_id ?? "").trim(),
+    String(adjustment.return_bill_entry_source_id ?? "").trim(),
+  ]);
+}
+
+function mergeCarriedReturnAdjustments(entries, financialYear, returnCodes) {
+  const reportEntries = [];
+  const carriedEntries = [];
+
+  for (const entry of entries) {
+    if (!entry.financial_year || entry.financial_year === financialYear) {
+      reportEntries.push({
+        ...entry,
+        return_adjustments: [...(entry.return_adjustments ?? [])],
+      });
+    } else if (entry.is_opening === true) {
+      carriedEntries.push(entry);
+    }
+  }
+
+  const entriesBySourceId = new Map();
+  const entriesBySourceAndNumber = new Map();
+  const adjustmentKeysByEntry = new Map();
+
+  for (const entry of reportEntries) {
+    if (returnCodes.includes(entry.code)) continue;
+    if (!hasSourceId(entry.bill_entry_source_id)) continue;
+
+    const companyKey = getAccountingCompanyKey(entry);
+    const sourceKey = createBillEntryKey(
+      companyKey,
+      entry.bill_entry_source_id,
+    );
+    const sourceEntries = entriesBySourceId.get(sourceKey) || [];
+    sourceEntries.push(entry);
+    entriesBySourceId.set(sourceKey, sourceEntries);
+
+    if (hasSourceId(entry.bill_no)) {
+      entriesBySourceAndNumber.set(
+        createBillEntryNumberKey(
+          companyKey,
+          entry.bill_entry_source_id,
+          entry.bill_no,
+        ),
+        entry,
+      );
+    }
+
+    adjustmentKeysByEntry.set(
+      entry,
+      new Set(entry.return_adjustments.map(getReturnAdjustmentKey)),
+    );
+  }
+
+  for (const carriedEntry of carriedEntries) {
+    if (returnCodes.includes(carriedEntry.code)) continue;
+    if (!hasSourceId(carriedEntry.bill_entry_source_id)) continue;
+
+    const companyKey = getAccountingCompanyKey(carriedEntry);
+    let targetEntry;
+    if (hasSourceId(carriedEntry.bill_no)) {
+      targetEntry = entriesBySourceAndNumber.get(
+        createBillEntryNumberKey(
+          companyKey,
+          carriedEntry.bill_entry_source_id,
+          carriedEntry.bill_no,
+        ),
+      );
+    } else {
+      const sourceMatches = entriesBySourceId.get(
+        createBillEntryKey(companyKey, carriedEntry.bill_entry_source_id),
+      );
+      if (sourceMatches?.length === 1) targetEntry = sourceMatches[0];
+    }
+    if (!targetEntry) continue;
+
+    const adjustmentKeys = adjustmentKeysByEntry.get(targetEntry);
+    for (const adjustment of carriedEntry.return_adjustments ?? []) {
+      const adjustmentKey = getReturnAdjustmentKey(adjustment);
+      if (adjustmentKeys.has(adjustmentKey)) continue;
+      adjustmentKeys.add(adjustmentKey);
+      targetEntry.return_adjustments.push(adjustment);
+    }
+  }
+
+  return reportEntries;
+}
+
 function getPaymentDays(billDate, payment) {
   const paymentDate = payment.clearing_date || payment.cheque_date;
   if (!paymentDate) return null;
@@ -334,10 +424,15 @@ function buildOutstandingReport(entries, allocations, options) {
 }
 
 async function getOutstandingReport(reportContext, options, financialYear) {
-  const entries = await outstandingQueries.findBillEntries(
+  const fetchedEntries = await outstandingQueries.findBillEntries(
     reportContext,
     [...options.transactionCodes, ...options.returnCodes],
     financialYear,
+  );
+  const entries = mergeCarriedReturnAdjustments(
+    fetchedEntries,
+    financialYear,
+    options.returnCodes,
   );
   const billEntries = entries.filter(
     (entry) => !options.returnCodes.includes(entry.code) && entry.bill_no,
