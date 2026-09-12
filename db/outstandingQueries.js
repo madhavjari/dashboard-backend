@@ -131,10 +131,11 @@ async function findPaymentAllocations(
         // earlier vouchers also prevents reused source IDs and bill numbers
         // from being counted against the wrong invoice.
         financialYear: { gte: financialYear },
-        // Opening vouchers carry the prior database's accounting state into a
-        // new financial year. They are not new receipts/payments and counting
-        // them again would double-adjust the carried opening bill.
-        isOpening: false,
+        // Opening vouchers in the selected year represent payments already
+        // carried into that year's opening balance and must be applied. An
+        // opening voucher in a later year is a carried copy of state already
+        // counted in an earlier year, so only real vouchers are taken later.
+        OR: [{ financialYear }, { isOpening: false }],
       },
     },
     select: {

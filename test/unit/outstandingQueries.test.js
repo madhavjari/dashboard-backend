@@ -91,7 +91,7 @@ describe("outstanding financial-year queries", () => {
     );
   });
 
-  test("uses current-or-later non-opening vouchers across accounting company records", async () => {
+  test("keeps selected-year openings but excludes carried copies from later years", async () => {
     await findPaymentAllocations(
       {
         mode: "authenticated",
@@ -113,7 +113,10 @@ describe("outstanding financial-year queries", () => {
           ],
           paymentVoucher: {
             financialYear: { gte: "2026-2027" },
-            isOpening: false,
+            OR: [
+              { financialYear: "2026-2027" },
+              { isOpening: false },
+            ],
           },
         }),
       }),
